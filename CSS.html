@@ -289,6 +289,8 @@
     .sticky-panel {
       position: sticky;
       top: 40px;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
     }
 
     .mobile-only-btn {
@@ -945,6 +947,10 @@
   .db-table td {
     color: #334155;
     font-weight: 500;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Table Status Pills */
@@ -999,5 +1005,43 @@
     z-index: 10000;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(4px);
+  }
+  /* Day Checkbox Pills */
+  .day-checkbox-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .day-checkbox {
+    display: inline-block;
+    cursor: pointer;
+    margin: 0;
+  }
+  .day-checkbox input {
+    display: none;
+  }
+  .day-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 16px;
+    border-radius: 20px;
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+  }
+  .day-checkbox input:checked + .day-label {
+    background-color: var(--ea-gold);
+    border-color: var(--ea-gold);
+    color: var(--ea-navy);
+    box-shadow: 0 2px 8px rgba(255, 184, 0, 0.3);
+  }
+  .day-checkbox:hover .day-label {
+    border-color: var(--ea-gold);
   }
 </style>

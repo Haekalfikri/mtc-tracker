@@ -1,6 +1,37 @@
-const SECURITY_PIN = "6661";
-const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1ghCLNrTNu7DskTJk8L32z67k9s4AMMfNcZfTAi-Sgi4/edit?usp=drivesdk";
 const TIMEZONE = "GMT+08:00"; // WITA
+
+function _getPin() { return PropertiesService.getUserProperties().getProperty('SECURITY_PIN') || ""; }
+function _getUrl() { return PropertiesService.getUserProperties().getProperty('SPREADSHEET_URL') || ""; }
+
+function getAppConfig() {
+    var props = PropertiesService.getUserProperties();
+    return {
+        isSetup: props.getProperty('APP_SETUP_DONE') === 'true',
+        pin: props.getProperty('SECURITY_PIN') || "",
+        url: props.getProperty('SPREADSHEET_URL') || ""
+    };
+}
+
+function saveAppSetup(url, pin) {
+    if (!url || !pin) return { status: 'error', message: 'URL dan PIN wajib diisi!' };
+    var props = PropertiesService.getUserProperties();
+    props.setProperty('SPREADSHEET_URL', url);
+    props.setProperty('SECURITY_PIN', pin);
+    props.setProperty('APP_SETUP_DONE', 'true');
+    return { status: 'success' };
+}
+
+function getFullAppConfig(clientPin) {
+    if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
+    var props = PropertiesService.getUserProperties();
+    var dbId = getPersonalDbId();
+    var personalDbUrl = "https://docs.google.com/spreadsheets/d/" + dbId + "/edit";
+    return {
+        url: props.getProperty('SPREADSHEET_URL') || '',
+        pin: props.getProperty('SECURITY_PIN') || '',
+        personalDbUrl: personalDbUrl
+    };
+}
 
 function doGet() {
     return HtmlService.createTemplateFromFile('Index')
@@ -15,7 +46,7 @@ function include(filename) {
 }
 
 function verifyPin(pin) {
-    return { success: pin === SECURITY_PIN };
+    return { success: pin === _getPin() };
 }
 
 // ==========================================
@@ -85,8 +116,8 @@ function parseTanggalToDateObj(rawDate) {
 // TRACKER DASHBOARD & SAVE (Main DB)
 // ==========================================
 function getDashboardStats(selectedDateStr, clientPin) {
-    if (clientPin !== SECURITY_PIN) throw new Error("Akses ditolak: PIN salah.");
-    var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
+    var ss = SpreadsheetApp.openByUrl(_getUrl());
     var sheet = ss.getSheetByName('Tracker');
     if (!sheet) throw new Error("Sheet 'Tracker' tidak ditemukan.");
 
@@ -165,9 +196,9 @@ function getDashboardStats(selectedDateStr, clientPin) {
 }
 
 function simpanDataTracker(entries, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
-        var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+        var ss = SpreadsheetApp.openByUrl(_getUrl());
         var sheet = ss.getSheetByName('Tracker');
 
         // Cari baris kosong pertama di Kolom D (Tanggal) agar tidak menimpa jika ada rumus yang ditarik jauh ke bawah
@@ -315,9 +346,9 @@ function simpanDataTracker(entries, clientPin) {
 }
 
 function hapusBarisTracker(rowIndex, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
-        var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+        var ss = SpreadsheetApp.openByUrl(_getUrl());
         var sheet = ss.getSheetByName('Tracker');
         sheet.deleteRow(rowIndex);
         return { status: 'success', message: 'Sesi berhasil dihapus.' };
@@ -327,9 +358,9 @@ function hapusBarisTracker(rowIndex, clientPin) {
 }
 
 function editBarisTracker(rowIndex, d, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
-        var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+        var ss = SpreadsheetApp.openByUrl(_getUrl());
         var sheet = ss.getSheetByName('Tracker');
         
         var dateParts = d.date.split('-');
@@ -370,7 +401,7 @@ function getOrCreateRutinSheet(ss) {
 }
 
 function getJadwalRutin(clientPin) {
-    if (clientPin !== SECURITY_PIN) throw new Error("Akses ditolak: PIN salah.");
+    if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
     var ss = SpreadsheetApp.openById(getPersonalDbId());
     var sheet = getOrCreateRutinSheet(ss);
     var lastRow = sheet.getLastRow();
@@ -395,7 +426,7 @@ function getJadwalRutin(clientPin) {
 }
 
 function saveJadwalRutin(item, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
         var ss = SpreadsheetApp.openById(getPersonalDbId());
         var sheet = getOrCreateRutinSheet(ss);
@@ -425,7 +456,7 @@ function saveJadwalRutin(item, clientPin) {
 }
 
 function deleteJadwalRutin(id, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
         var ss = SpreadsheetApp.openById(getPersonalDbId());
         var sheet = getOrCreateRutinSheet(ss);
@@ -462,7 +493,7 @@ function getOrCreateDayoffSheet(ss) {
 }
 
 function getDayoffData(clientPin) {
-    if (clientPin !== SECURITY_PIN) throw new Error("Akses ditolak: PIN salah.");
+    if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
     var ss = SpreadsheetApp.openById(getPersonalDbId());
     var sheet = getOrCreateDayoffSheet(ss);
     var lastRow = sheet.getLastRow();
@@ -486,7 +517,7 @@ function getDayoffData(clientPin) {
 }
 
 function saveDayoffData(item, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
         var ss = SpreadsheetApp.openById(getPersonalDbId());
         var sheet = getOrCreateDayoffSheet(ss);
@@ -516,7 +547,7 @@ function saveDayoffData(item, clientPin) {
 }
 
 function deleteDayoffData(id, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
         var ss = SpreadsheetApp.openById(getPersonalDbId());
         var sheet = getOrCreateDayoffSheet(ss);
@@ -554,7 +585,7 @@ function getOrCreateKelasSheet(ss) {
 }
 
 function getKelasConfig(clientPin) {
-    if (clientPin !== SECURITY_PIN) throw new Error("Akses ditolak: PIN salah.");
+    if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
     var ss = SpreadsheetApp.openById(getPersonalDbId());
     var sheet = getOrCreateKelasSheet(ss);
     var lastRow = sheet.getLastRow();
@@ -574,7 +605,7 @@ function getKelasConfig(clientPin) {
 }
 
 function saveKelas(item, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
         var ss = SpreadsheetApp.openById(getPersonalDbId());
         var sheet = getOrCreateKelasSheet(ss);
@@ -602,7 +633,7 @@ function saveKelas(item, clientPin) {
 }
 
 function deleteKelas(id, clientPin) {
-    if (clientPin !== SECURITY_PIN) return { status: 'error', message: 'PIN salah!' };
+    if (clientPin !== _getPin()) return { status: 'error', message: 'PIN salah!' };
     try {
         var ss = SpreadsheetApp.openById(getPersonalDbId());
         var sheet = getOrCreateKelasSheet(ss);
@@ -623,8 +654,8 @@ function deleteKelas(id, clientPin) {
 // DATABASE TRACKER (Full Data Fetch)
 // =======================================================
 function getAllTrackerData(clientPin) {
-    if (clientPin !== SECURITY_PIN) throw new Error("Akses ditolak: PIN salah.");
-    var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+    if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
+    var ss = SpreadsheetApp.openByUrl(_getUrl());
     var sheet = ss.getSheetByName('Tracker');
     if (!sheet) throw new Error("Sheet Tracker tidak ditemukan.");
 
@@ -677,6 +708,7 @@ function getAllTrackerData(clientPin) {
             duration: Math.round(duration * 10) / 10,
             product: row[5],
             category: row[6],
+            level: row[7],
             taskType: row[8],
             taskDesc: row[9],
             status: row[11],

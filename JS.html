@@ -1,1032 +1,1248 @@
 <script>
-var currentPin = '';
-var listRutinData = [];
-var listKelasData = [];
-var listDayoffData = [];
-var todayLogsData = [];
-var editingRowIndex = null;
+  var currentPin = '';
+  var listRutinData = [];
+  var listKelasData = [];
+  var listDayoffData = [];
+  var todayLogsData = [];
+  var editingRowIndex = null;
 
-window.onload = function() {
-  var today = new Date().toISOString().split('T')[0];
-  document.getElementById('mDate').value = today;
-  document.getElementById('doDate').value = today;
-  document.getElementById('bDate').value = today;
+  window.onload = function () {
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('mDate').value = today;
+    document.getElementById('doDate').value = today;
+    document.getElementById('bDate').value = today;
 
-  document.getElementById('pinInput').value = '';
-  document.getElementById('pinOverlay').style.display = 'flex';
-  document.getElementById('appContent').style.display = 'none';
-};
+    document.getElementById('pinInput').value = '';
+    document.getElementById('appContent').style.display = 'none';
 
-function submitPin() {
-  var pin = document.getElementById('pinInput').value;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (res.success) {
-        currentPin = pin;
-        document.getElementById('pinOverlay').style.display = 'none';
-        document.getElementById('appContent').style.display = 'flex';
-        loadDashboard();
-        loadRutinData();
-        loadKelasData();
-        loadDayoffData();
-      } else {
-        document.getElementById('pinError').style.display = 'block';
-      }
-    })
-    .verifyPin(pin);
-}
-
-function showToast(msg) {
-  var t = document.getElementById('toast');
-  t.innerText = msg;
-  t.style.display = 'block';
-  setTimeout(function() { t.style.display = 'none'; }, 3200);
-}
-
-function toggleSidebar() {
-  var sidebar = document.getElementById('appSidebar');
-  sidebar.classList.toggle('open');
-}
-
-function switchView(viewId, el) {
-  // Update sidebar active link
-  document.querySelectorAll('.sidebar-menu a').forEach(function(a) {
-    a.classList.remove('active');
-  });
-  if (el) el.classList.add('active');
-
-  // Switch view panels
-  document.querySelectorAll('.view-panel').forEach(function(panel) {
-    panel.style.display = 'none';
-    panel.classList.remove('active');
-  });
-  document.getElementById(viewId).style.display = 'block';
-  document.getElementById(viewId).classList.add('active');
-
-  // Close sidebar on mobile after clicking a link
-  var sidebar = document.getElementById('appSidebar');
-  if (sidebar && sidebar.classList.contains('open')) {
-    sidebar.classList.remove('open');
-  }
-}
-
-// ==========================================
-// AUTO ADJUST TASK TYPE
-// ==========================================
-const categoryToTaskTypeMap = {
-  "Main Class": "Teaching",
-  "Graduation": "Teaching",
-  "Catch Up Class": "Teaching",
-  "Trial Class": "Teaching",
-  "English Club": "Teaching",
-  "EA Clinic": "Teaching",
-  "Pre-Class": "Teaching",
-  "Additional Class": "Teaching",
-  "Training & Coaching": "Training",
-  "Weekly Meeting": "Meeting",
-  "Material Creation": "Planning",
-  "Observation": "Observation",
-  "Scoring Observation": "Observation",
-  "Class Preparation": "Planning",
-  "Daily Coordination": "Coordination",
-  "Hiring": "Interview",
-  "OPT": "Teaching",
-  "Teacher's note": "Admin"
-};
-
-function autoAdjustTaskTypeFromCategory(categorySelectId, taskTypeSelectId) {
-  var categoryVal = document.getElementById(categorySelectId).value;
-  var taskTypeSelect = document.getElementById(taskTypeSelectId);
-  if (categoryToTaskTypeMap[categoryVal]) {
-    // If the option exists in the taskType select, set it
-    for (var i = 0; i < taskTypeSelect.options.length; i++) {
-        if (taskTypeSelect.options[i].value === categoryToTaskTypeMap[categoryVal]) {
-            taskTypeSelect.value = categoryToTaskTypeMap[categoryVal];
-            break;
+    // Cek apakah aplikasi sudah disetup pertama kali
+    google.script.run
+      .withSuccessHandler(function (config) {
+        if (!config.isSetup) {
+          document.getElementById('setupOverlay').style.display = 'flex';
+          document.getElementById('pinOverlay').style.display = 'none';
+        } else {
+          document.getElementById('setupOverlay').style.display = 'none';
+          document.getElementById('pinOverlay').style.display = 'flex';
         }
-    }
-  }
-}
-
-function autoAdjustCategory() {
-  autoAdjustTaskTypeFromCategory('mCategory', 'mTaskType');
-}
-
-function autoAdjustTaskType() {
-  // Can be left empty or used for reverse adjust if needed
-}
-
-// ==========================================
-// TRACKER & DASHBOARD
-// ==========================================
-function loadDashboard() {
-  var dateStr = document.getElementById('mDate').value;
-  document.getElementById('lblLogDate').innerText = dateStr;
-
-  google.script.run
-    .withSuccessHandler(renderDashboard)
-    .withFailureHandler(function(err) { showToast("Gagal memuat: " + err.message); })
-    .getDashboardStats(dateStr, currentPin);
-}
-
-function renderDashboard(data) {
-  if (data.spreadsheetName && document.getElementById('displayHeaderName')) {
-    document.getElementById('displayHeaderName').innerText = data.spreadsheetName;
-  }
-  document.getElementById('txtDailyHours').innerText = data.dailyHours + " jam";
-
-  var wHours = data.weeklyWorkingHours;
-  document.getElementById('txtWorkingHours').innerText = wHours + " / 30 jam";
-  var wPct = Math.min(100, Math.round((wHours / 30) * 100));
-  var barW = document.getElementById('barWorkingHours');
-  var insightW = document.getElementById('insightWorking');
-  barW.style.width = wPct + "%";
-
-  if (wHours < 30) {
-    barW.style.backgroundColor = "var(--warning)";
-    insightW.innerHTML = '<span class="insight-warning">Masih kurang ' + (30 - wHours).toFixed(1) + ' jam</span> menuju target mingguan. Semangat!';
-  } else if (wHours < 40) {
-    barW.style.backgroundColor = "var(--success)";
-    insightW.innerHTML = '<span class="insight-success">Luar biasa!</span> Target jam kerja mingguan terpenuhi.';
-  } else if (wHours < 50) {
-    barW.style.backgroundColor = "var(--warning)";
-    insightW.innerHTML = '<span class="insight-warning">Waspada beban tinggi!</span> Anda sudah bekerja ' + wHours + ' jam minggu ini.';
-  } else {
-    barW.style.backgroundColor = "var(--danger)";
-    insightW.innerHTML = '<span style="color:var(--danger); font-weight:700;">Overload!</span> Tolong perhatikan jam istirahat Anda (≥ 50 jam).';
-  }
-
-  var tHours = data.weeklyTeachingHours;
-  document.getElementById('txtTeachingHours').innerText = tHours + " / 18 jam";
-  var tPct = Math.min(100, Math.round((tHours / 18) * 100));
-  var barT = document.getElementById('barTeachingHours');
-  var insightT = document.getElementById('insightTeaching');
-  barT.style.width = tPct + "%";
-
-  if (tHours < 18) {
-    barT.style.backgroundColor = "var(--warning)";
-    insightT.innerHTML = '<span class="insight-warning">Butuh ' + (18 - tHours).toFixed(1) + ' jam ajar lagi</span> untuk memenuhi target mingguan.';
-  } else {
-    barT.style.backgroundColor = "var(--success)";
-    insightT.innerHTML = '<span class="insight-success">Hebat!</span> Target mengajar mingguan sudah tercapai penuh.';
-  }
-
-  var logContainer = document.getElementById('logList');
-  todayLogsData = data.todayLogs || [];
-  if (todayLogsData.length === 0) {
-    logContainer.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:0.82rem; padding:20px 0;">Belum ada sesi tercatat di tanggal ini.</div>';
-    return;
-  }
-
-  var html = '';
-  todayLogsData.forEach(function(item, index) {
-    html += '<div class="timeline-item">' +
-              '<div class="timeline-content">' +
-                '<div>' +
-                  '<div class="timeline-title">' + item.category + ' (' + item.product + ')</div>' +
-                  '<div class="timeline-subtitle">' + item.time + ' • ' + item.duration + ' jam • ' + item.taskDesc + '</div>' +
-                '</div>' +
-                '<div class="timeline-action" style="display:flex; gap:6px;">' +
-                  '<button title="Edit" onclick="editSession(' + index + ')" style="color:var(--ea-navy); border-color:#e2e8f0;">' +
-                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
-                  '</button>' +
-                  '<button title="Hapus" onclick="deleteSession(' + item.rowIndex + ')">' +
-                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>' +
-                  '</button>' +
-                '</div>' +
-              '</div>' +
-            '</div>';
-  });
-  logContainer.innerHTML = html;
-}
-
-function editSession(index) {
-  var item = todayLogsData[index];
-  editingRowIndex = item.rowIndex;
-  
-  var times = item.time.split('-');
-  var sTime = times[0] ? times[0].trim() : '';
-  var eTime = times[1] ? times[1].trim() : '';
-  
-  document.getElementById('mStartTime').value = sTime;
-  document.getElementById('mEndTime').value = eTime;
-  document.getElementById('mProduct').value = item.product || 'EAC';
-  document.getElementById('mCategory').value = item.category || '';
-  document.getElementById('mLevel').value = item.level || '';
-  document.getElementById('mTaskType').value = item.taskType || '';
-  document.getElementById('mDesc').value = item.taskDesc || '';
-  
-  var btn = document.getElementById('btnSubmitManual');
-  btn.innerText = "Simpan Perubahan";
-  
-  if (!document.getElementById('btnCancelEdit')) {
-    var cancelBtn = document.createElement('button');
-    cancelBtn.id = 'btnCancelEdit';
-    cancelBtn.className = 'btn-outline';
-    cancelBtn.style.marginTop = '12px';
-    cancelBtn.style.width = '100%';
-    cancelBtn.innerText = "Batal Edit";
-    cancelBtn.onclick = cancelEdit;
-    btn.parentNode.insertBefore(cancelBtn, btn.nextSibling);
-  }
-  document.getElementById('btnCancelEdit').style.display = 'block';
-
-  switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
-}
-
-function cancelEdit() {
-  editingRowIndex = null;
-  document.getElementById('formManual').reset();
-  var today = new Date().toISOString().split('T')[0];
-  document.getElementById('mDate').value = today;
-  
-  document.getElementById('btnSubmitManual').innerText = "Submit Tracker";
-  var cancelBtn = document.getElementById('btnCancelEdit');
-  if (cancelBtn) cancelBtn.style.display = 'none';
-  
-  switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
-}
-
-function deleteSession(rowIndex) {
-  if (!confirm("Hapus baris sesi ini dari Spreadsheet?")) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      showToast(res.message);
-      loadDashboard();
-    })
-    .hapusBarisTracker(rowIndex, currentPin);
-}
-
-// ==========================================
-// FORM LOGIC
-// ==========================================
-function autoAdjustProduct() {
-  var prod = document.getElementById('mProduct').value;
-  var taskType = document.getElementById('mTaskType').value;
-  if (prod === 'EAC' && taskType === 'Teaching') {
-    document.getElementById('mLevel').value = 'Non Dasher';
-  }
-}
-function autoAdjustTaskType() { autoAdjustProduct(); }
-function autoAdjustCategory() {
-  var cat = document.getElementById('mCategory').value;
-  if (cat === 'Daily Coordination') {
-    document.getElementById('mTaskType').value = 'Coordination';
-    document.getElementById('mDesc').value = 'Coordination with SA and BM';
-  } else if (cat === 'Material Creation') {
-    document.getElementById('mTaskType').value = 'Planning';
-    var prod = document.getElementById('mProduct').value;
-    document.getElementById('mDesc').value = (prod === 'EAC') ? 'Runner/Ranger' : 'Bahasa Inggris';
-  } else if (cat === 'Main Class') {
-    document.getElementById('mTaskType').value = 'Teaching';
-    autoAdjustProduct();
-  }
-}
-
-function setDesc(txt, product, category, taskType, level) {
-  document.getElementById('mDesc').value = txt;
-  if (product) document.getElementById('mProduct').value = product;
-  if (category) document.getElementById('mCategory').value = category;
-  if (taskType) document.getElementById('mTaskType').value = taskType;
-  if (level !== undefined) document.getElementById('mLevel').value = level;
-}
-
-function handleManualSubmit(e) {
-  e.preventDefault();
-  var btn = document.getElementById('btnSubmitManual');
-  btn.disabled = true;
-  btn.innerText = "Menyimpan...";
-
-  var entry = {
-    date: document.getElementById('mDate').value,
-    startTime: document.getElementById('mStartTime').value,
-    endTime: document.getElementById('mEndTime').value,
-    product: document.getElementById('mProduct').value,
-    level: document.getElementById('mLevel').value,
-    category: document.getElementById('mCategory').value,
-    taskType: document.getElementById('mTaskType').value,
-    taskDesc: document.getElementById('mDesc').value,
-    evidence: document.getElementById('mEvidence').value,
-    status: document.getElementById('mStatus').value || 'Done',
-    notes: document.getElementById('mNotes').value || ''
+      })
+      .getAppConfig();
   };
 
-  if (editingRowIndex) {
+  function submitSetup() {
+    var url = document.getElementById('setupUrlInput').value.trim();
+    var pin = document.getElementById('setupPinInput').value;
+    var errEl = document.getElementById('setupError');
+
+    if (!url || !pin || pin.length !== 4) {
+      errEl.innerText = "Pastikan URL Spreadsheet diisi dan PIN berisi 4 digit!";
+      errEl.style.display = 'block';
+      return;
+    }
+
+    var btn = document.getElementById('btnSubmitSetup');
+    btn.innerText = "Menyimpan...";
+    btn.disabled = true;
+
     google.script.run
-      .withSuccessHandler(function(res) {
-        showToast(res.message);
+      .withSuccessHandler(function (res) {
         if (res.status === 'success') {
-          cancelEdit();
+          currentPin = pin;
+          document.getElementById('setupOverlay').style.display = 'none';
+          document.getElementById('pinOverlay').style.display = 'none';
+          document.getElementById('appContent').style.display = 'flex';
           loadDashboard();
+          loadRutinData();
+          loadKelasData();
+          loadDayoffData();
         } else {
+          errEl.innerText = res.message;
+          errEl.style.display = 'block';
+          btn.innerText = "Simpan Konfigurasi";
+          btn.disabled = false;
+        }
+      })
+      .withFailureHandler(function (err) {
+        errEl.innerText = "Terjadi kesalahan: " + err.message;
+        errEl.style.display = 'block';
+        btn.innerText = "Simpan Konfigurasi";
+        btn.disabled = false;
+      })
+      .saveAppSetup(url, pin);
+  }
+
+  function submitPin() {
+    var pin = document.getElementById('pinInput').value;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res.success) {
+          currentPin = pin;
+          document.getElementById('pinOverlay').style.display = 'none';
+          document.getElementById('appContent').style.display = 'flex';
+          loadDashboard();
+          loadRutinData();
+          loadKelasData();
+          loadDayoffData();
+        } else {
+          document.getElementById('pinError').style.display = 'block';
+        }
+      })
+      .verifyPin(pin);
+  }
+
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.display = 'block';
+    setTimeout(function () { t.style.display = 'none'; }, 3200);
+  }
+
+  function toggleSidebar() {
+    var sidebar = document.getElementById('appSidebar');
+    sidebar.classList.toggle('open');
+  }
+
+  function switchView(viewId, el) {
+    // Update sidebar active link
+    document.querySelectorAll('.sidebar-menu a').forEach(function (a) {
+      a.classList.remove('active');
+    });
+    if (el) el.classList.add('active');
+
+    // Switch view panels
+    document.querySelectorAll('.view-panel').forEach(function (panel) {
+      panel.style.display = 'none';
+      panel.classList.remove('active');
+    });
+    document.getElementById(viewId).style.display = 'block';
+    document.getElementById(viewId).classList.add('active');
+
+    // Manage full-width layout for Data & Setting modes
+    var fullWidthModes = ['modeDatabase', 'modeKelas', 'modeConfig'];
+    var stickyPanel = document.querySelector('.sticky-panel');
+    var mainGrid = document.querySelector('.main-grid');
+    
+    if (fullWidthModes.includes(viewId)) {
+      if(stickyPanel) stickyPanel.style.display = 'none';
+      if(mainGrid) mainGrid.style.display = 'block';
+    } else {
+      if(stickyPanel) stickyPanel.style.display = 'block';
+      if(mainGrid) mainGrid.style.display = ''; // revert to CSS grid
+    }
+
+    // Close sidebar on mobile after clicking a link
+    var sidebar = document.getElementById('appSidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+    }
+  }
+
+  // ==========================================
+  // AUTO ADJUST TASK TYPE
+  // ==========================================
+  const categoryToTaskTypeMap = {
+    "Main Class": "Teaching",
+    "Graduation": "Teaching",
+    "Catch Up Class": "Teaching",
+    "Trial Class": "Teaching",
+    "English Club": "Teaching",
+    "EA Clinic": "Teaching",
+    "Pre-Class": "Teaching",
+    "Additional Class": "Teaching",
+    "Training & Coaching": "Training",
+    "Weekly Meeting": "Meeting",
+    "Material Creation": "Planning",
+    "Observation": "Observation",
+    "Scoring Observation": "Observation",
+    "Class Preparation": "Planning",
+    "Daily Coordination": "Coordination",
+    "Hiring": "Interview",
+    "OPT": "Teaching",
+    "Teacher's note": "Admin"
+  };
+
+  function autoAdjustTaskTypeFromCategory(categorySelectId, taskTypeSelectId) {
+    var categoryVal = document.getElementById(categorySelectId).value;
+    var taskTypeSelect = document.getElementById(taskTypeSelectId);
+    if (categoryToTaskTypeMap[categoryVal]) {
+      // If the option exists in the taskType select, set it
+      for (var i = 0; i < taskTypeSelect.options.length; i++) {
+        if (taskTypeSelect.options[i].value === categoryToTaskTypeMap[categoryVal]) {
+          taskTypeSelect.value = categoryToTaskTypeMap[categoryVal];
+          break;
+        }
+      }
+    }
+  }
+
+  function autoAdjustCategory() {
+    autoAdjustTaskTypeFromCategory('mCategory', 'mTaskType');
+  }
+
+  function autoAdjustTaskType() {
+    // Can be left empty or used for reverse adjust if needed
+  }
+
+  // ==========================================
+  // TRACKER & DASHBOARD
+  // ==========================================
+  function loadDashboard() {
+    var dateStr = document.getElementById('mDate').value;
+    document.getElementById('lblLogDate').innerText = dateStr;
+
+    google.script.run
+      .withSuccessHandler(renderDashboard)
+      .withFailureHandler(function (err) { showToast("Gagal memuat: " + err.message); })
+      .getDashboardStats(dateStr, currentPin);
+  }
+
+  function renderDashboard(data) {
+    if (data.spreadsheetName && document.getElementById('displayHeaderName')) {
+      document.getElementById('displayHeaderName').innerText = data.spreadsheetName;
+    }
+    document.getElementById('txtDailyHours').innerText = data.dailyHours + " jam";
+
+    var wHours = data.weeklyWorkingHours;
+    document.getElementById('txtWorkingHours').innerText = wHours + " / 30 jam";
+    var wPct = Math.min(100, Math.round((wHours / 30) * 100));
+    var barW = document.getElementById('barWorkingHours');
+    var insightW = document.getElementById('insightWorking');
+    barW.style.width = wPct + "%";
+
+    if (wHours < 30) {
+      barW.style.backgroundColor = "var(--warning)";
+      insightW.innerHTML = '<span class="insight-warning">Masih kurang ' + (30 - wHours).toFixed(1) + ' jam</span> menuju target mingguan. Semangat!';
+    } else if (wHours < 40) {
+      barW.style.backgroundColor = "var(--success)";
+      insightW.innerHTML = '<span class="insight-success">Luar biasa!</span> Target jam kerja mingguan terpenuhi.';
+    } else if (wHours < 50) {
+      barW.style.backgroundColor = "var(--warning)";
+      insightW.innerHTML = '<span class="insight-warning">Waspada beban tinggi!</span> Anda sudah bekerja ' + wHours + ' jam minggu ini.';
+    } else {
+      barW.style.backgroundColor = "var(--danger)";
+      insightW.innerHTML = '<span style="color:var(--danger); font-weight:700;">Overload!</span> Tolong perhatikan jam istirahat Anda (≥ 50 jam).';
+    }
+
+    var tHours = data.weeklyTeachingHours;
+    document.getElementById('txtTeachingHours').innerText = tHours + " / 18 jam";
+    var tPct = Math.min(100, Math.round((tHours / 18) * 100));
+    var barT = document.getElementById('barTeachingHours');
+    var insightT = document.getElementById('insightTeaching');
+    barT.style.width = tPct + "%";
+
+    if (tHours < 18) {
+      barT.style.backgroundColor = "var(--warning)";
+      insightT.innerHTML = '<span class="insight-warning">Butuh ' + (18 - tHours).toFixed(1) + ' jam ajar lagi</span> untuk memenuhi target mingguan.';
+    } else {
+      barT.style.backgroundColor = "var(--success)";
+      insightT.innerHTML = '<span class="insight-success">Hebat!</span> Target mengajar mingguan sudah tercapai penuh.';
+    }
+
+    var logContainer = document.getElementById('logList');
+    todayLogsData = data.todayLogs || [];
+    if (todayLogsData.length === 0) {
+      logContainer.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:0.82rem; padding:20px 0;">Belum ada sesi tercatat di tanggal ini.</div>';
+      return;
+    }
+
+    var html = '';
+    todayLogsData.forEach(function (item, index) {
+      html += '<div class="timeline-item">' +
+        '<div class="timeline-content">' +
+        '<div>' +
+        '<div class="timeline-title">' + item.category + ' (' + item.product + ')</div>' +
+        '<div class="timeline-subtitle">' + item.time + ' • ' + item.duration + ' jam • ' + item.taskDesc + '</div>' +
+        '</div>' +
+        '<div class="timeline-action" style="display:flex; gap:6px;">' +
+        '<button title="Edit" onclick="editSession(' + index + ')" style="color:var(--ea-navy); border-color:#e2e8f0;">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
+        '</button>' +
+        '<button title="Hapus" onclick="deleteSession(' + item.rowIndex + ')">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>' +
+        '</button>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+    });
+    logContainer.innerHTML = html;
+  }
+
+  function editSession(index) {
+    var item = todayLogsData[index];
+    editingRowIndex = item.rowIndex;
+
+    var times = item.time.split('-');
+    var sTime = times[0] ? times[0].trim() : '';
+    var eTime = times[1] ? times[1].trim() : '';
+
+    document.getElementById('mStartTime').value = sTime;
+    document.getElementById('mEndTime').value = eTime;
+    document.getElementById('mProduct').value = item.product || 'EAC';
+    document.getElementById('mCategory').value = item.category || '';
+    document.getElementById('mLevel').value = item.level || '';
+    document.getElementById('mTaskType').value = item.taskType || '';
+    document.getElementById('mDesc').value = item.taskDesc || '';
+
+    var btn = document.getElementById('btnSubmitManual');
+    btn.innerText = "Simpan Perubahan";
+
+    if (!document.getElementById('btnCancelEdit')) {
+      var cancelBtn = document.createElement('button');
+      cancelBtn.id = 'btnCancelEdit';
+      cancelBtn.className = 'btn-outline';
+      cancelBtn.style.marginTop = '12px';
+      cancelBtn.style.width = '100%';
+      cancelBtn.innerText = "Batal Edit";
+      cancelBtn.onclick = cancelEdit;
+      btn.parentNode.insertBefore(cancelBtn, btn.nextSibling);
+    }
+    document.getElementById('btnCancelEdit').style.display = 'block';
+
+    switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+  }
+
+  function cancelEdit() {
+    editingRowIndex = null;
+    document.getElementById('formManual').reset();
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('mDate').value = today;
+
+    document.getElementById('btnSubmitManual').innerText = "Submit Tracker";
+    var cancelBtn = document.getElementById('btnCancelEdit');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+
+    switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+  }
+
+  function deleteSession(rowIndex) {
+    if (!confirm("Hapus baris sesi ini dari Spreadsheet?")) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        showToast(res.message);
+        loadDashboard();
+      })
+      .hapusBarisTracker(rowIndex, currentPin);
+  }
+
+  // ==========================================
+  // FORM LOGIC
+  // ==========================================
+  function autoAdjustProduct() {
+    var prod = document.getElementById('mProduct').value;
+    var taskType = document.getElementById('mTaskType').value;
+    if (prod === 'EAC' && taskType === 'Teaching') {
+      document.getElementById('mLevel').value = 'Non Dasher';
+    }
+  }
+  function autoAdjustTaskType() { autoAdjustProduct(); }
+  function autoAdjustCategory() {
+    var cat = document.getElementById('mCategory').value;
+    if (cat === 'Daily Coordination') {
+      document.getElementById('mTaskType').value = 'Coordination';
+      document.getElementById('mDesc').value = 'Coordination with SA and BM';
+    } else if (cat === 'Material Creation') {
+      document.getElementById('mTaskType').value = 'Planning';
+      var prod = document.getElementById('mProduct').value;
+      document.getElementById('mDesc').value = (prod === 'EAC') ? 'Runner/Ranger' : 'Bahasa Inggris';
+    } else if (cat === 'Main Class') {
+      document.getElementById('mTaskType').value = 'Teaching';
+      autoAdjustProduct();
+    }
+  }
+
+  function setDesc(txt, product, category, taskType, level) {
+    document.getElementById('mDesc').value = txt;
+    if (product) document.getElementById('mProduct').value = product;
+    if (category) document.getElementById('mCategory').value = category;
+    if (taskType) document.getElementById('mTaskType').value = taskType;
+    if (level !== undefined) document.getElementById('mLevel').value = level;
+  }
+
+  function handleManualSubmit(e) {
+    e.preventDefault();
+    var btn = document.getElementById('btnSubmitManual');
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
+
+    var entry = {
+      date: document.getElementById('mDate').value,
+      startTime: document.getElementById('mStartTime').value,
+      endTime: document.getElementById('mEndTime').value,
+      product: document.getElementById('mProduct').value,
+      level: document.getElementById('mLevel').value,
+      category: document.getElementById('mCategory').value,
+      taskType: document.getElementById('mTaskType').value,
+      taskDesc: document.getElementById('mDesc').value,
+      evidence: document.getElementById('mEvidence').value,
+      status: document.getElementById('mStatus').value || 'Done',
+      notes: document.getElementById('mNotes').value || ''
+    };
+
+    if (editingRowIndex) {
+      google.script.run
+        .withSuccessHandler(function (res) {
+          showToast(res.message);
+          if (res.status === 'success') {
+            cancelEdit();
+            loadDashboard();
+          } else {
+            btn.disabled = false;
+            btn.innerText = "Simpan Perubahan";
+          }
+        })
+        .withFailureHandler(function (err) {
+          showToast("Error: " + err.message);
           btn.disabled = false;
           btn.innerText = "Simpan Perubahan";
-        }
-      })
-      .withFailureHandler(function(err) {
-        showToast("Error: " + err.message);
-        btn.disabled = false;
-        btn.innerText = "Simpan Perubahan";
-      })
-      .editBarisTracker(editingRowIndex, entry, currentPin);
-  } else {
-    google.script.run
-      .withSuccessHandler(function(res) {
-        showToast(res.message);
-        if (res.status === 'success') {
-          document.getElementById('formManual').reset();
-          document.getElementById('mDate').value = entry.date;
-          loadDashboard();
-          switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
-        }
-        btn.disabled = false;
-        btn.innerText = "Submit Tracker";
-      })
-      .withFailureHandler(function(err) {
-        showToast("Error: " + err.message);
-        btn.disabled = false;
-        btn.innerText = "Submit Tracker";
-      })
-      .simpanDataTracker([entry], currentPin);
-  }
-}
-
-function submitDayOff() {
-  var btn = document.getElementById('btnSubmitDayoff');
-  btn.disabled = true;
-  btn.innerText = "Membuat aktivitas...";
-  var d = document.getElementById('doDate').value;
-  
-  if (!d) {
-    alert("Pilih tanggal terlebih dahulu!");
-    btn.disabled = false;
-    btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
-    return;
-  }
-  
-  if (listDayoffData.length === 0) {
-    alert("Tidak ada aktivitas Hari Kosong yang tersedia!");
-    btn.disabled = false;
-    btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
-    return;
+        })
+        .editBarisTracker(editingRowIndex, entry, currentPin);
+    } else {
+      google.script.run
+        .withSuccessHandler(function (res) {
+          showToast(res.message);
+          if (res.status === 'success') {
+            document.getElementById('formManual').reset();
+            document.getElementById('mDate').value = entry.date;
+            loadDashboard();
+            switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+          }
+          btn.disabled = false;
+          btn.innerText = "Submit Tracker";
+        })
+        .withFailureHandler(function (err) {
+          showToast("Error: " + err.message);
+          btn.disabled = false;
+          btn.innerText = "Submit Tracker";
+        })
+        .simpanDataTracker([entry], currentPin);
+    }
   }
 
-  var entries = [];
-  listDayoffData.forEach(function(item) {
-    entries.push({
-      date: d, startTime: item.startTime, endTime: item.endTime,
-      product: item.product, level: item.level, category: item.category,
-      taskType: item.taskType, taskDesc: item.taskDesc, status: "Done"
+  function submitDayOff() {
+    var btn = document.getElementById('btnSubmitDayoff');
+    btn.disabled = true;
+    btn.innerText = "Membuat aktivitas...";
+    var d = document.getElementById('doDate').value;
+
+    if (!d) {
+      alert("Pilih tanggal terlebih dahulu!");
+      btn.disabled = false;
+      btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
+      return;
+    }
+
+    if (listDayoffData.length === 0) {
+      alert("Tidak ada aktivitas Hari Kosong yang tersedia!");
+      btn.disabled = false;
+      btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
+      return;
+    }
+
+    var entries = [];
+    listDayoffData.forEach(function (item) {
+      entries.push({
+        date: d, startTime: item.startTime, endTime: item.endTime,
+        product: item.product, level: item.level, category: item.category,
+        taskType: item.taskType, taskDesc: item.taskDesc, status: "Done"
+      });
     });
-  });
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      btn.disabled = false;
-      btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
-      showToast(res.message);
-      switchView('modeManual');
-      loadDashboard();
-    })
-    .withFailureHandler(function(err) {
-      btn.disabled = false;
-      btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
-      alert("Gagal: " + err.message);
-    })
-    .simpanDataTracker(entries, currentPin);
-}
-
-// ==========================================
-// CRUD HARI KOSONG (FRONTEND)
-// ==========================================
-function loadDayoffData() {
-  google.script.run
-    .withSuccessHandler(renderDayoffCards)
-    .withFailureHandler(function(err) {
-      console.error("Gagal loadDayoffData:", err);
-      alert("Gagal memuat aktivitas hari kosong: " + err.message);
-      var container = document.getElementById('dayoffContainer');
-      if (container) container.innerHTML = '<div style="color:red; text-align:center;">Gagal memuat data.</div>';
-    })
-    .getDayoffData(currentPin);
-}
-
-function renderDayoffCards(data) {
-  listDayoffData = data || [];
-  var container = document.getElementById('dayoffContainer');
-  if (listDayoffData.length === 0) {
-    container.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:16px;">Belum ada aktivitas. Silakan tambah baru.</div>';
-    return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        btn.disabled = false;
+        btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
+        showToast(res.message);
+        switchView('modeManual');
+        loadDashboard();
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false;
+        btn.innerText = "Buat Aktivitas Hari Kosong Otomatis";
+        alert("Gagal: " + err.message);
+      })
+      .simpanDataTracker(entries, currentPin);
   }
 
-  var html = '';
-  listDayoffData.forEach(function(item, idx) {
-    html += '<div class="schedule-card" style="margin-bottom:12px;">' +
-              '<div class="schedule-info">' +
-                '<span class="schedule-title" style="margin-bottom:4px;">' + item.judul + '</span>' +
-                '<div class="schedule-detail">' + item.startTime + ' - ' + item.endTime + ' • ' + item.product + ' (' + item.taskType + ') • ' + item.taskDesc + '</div>' +
-              '</div>' +
-              '<div class="schedule-actions">' +
-                '<button class="btn-sm" style="background:#E2E8F0; color:var(--text-main);" onclick="editDayoff(' + idx + ')">Edit</button>' +
-                '<button class="btn-sm" style="background:#FEE2E2; color:var(--danger);" onclick="deleteDayoff(\'' + item.id + '\')">Hapus</button>' +
-              '</div>' +
-            '</div>';
-  });
-
-  container.innerHTML = html;
-}
-
-function openModalDayoff() {
-  document.getElementById('modalDayoffTitle').innerText = "Tambah Aktivitas Hari Kosong";
-  document.getElementById('doId').value = "";
-  document.getElementById('formDayoffModal').reset();
-  document.getElementById('modalDayoff').style.display = 'flex';
-}
-
-function editDayoff(idx) {
-  var item = listDayoffData[idx];
-  document.getElementById('modalDayoffTitle').innerText = "Edit Aktivitas Hari Kosong";
-  document.getElementById('formDayoffModal').reset();
-  document.getElementById('doId').value = item.id;
-  document.getElementById('doJudul').value = item.judul;
-  document.getElementById('doStartTime').value = item.startTime;
-  document.getElementById('doEndTime').value = item.endTime;
-  document.getElementById('doProduct').value = item.product;
-  document.getElementById('doLevel').value = item.level;
-  document.getElementById('doCategory').value = item.category;
-  document.getElementById('doTaskType').value = item.taskType;
-  document.getElementById('doTaskDesc').value = item.taskDesc;
-  document.getElementById('modalDayoff').style.display = 'flex';
-}
-
-function saveDayoffModal(e) {
-  e.preventDefault();
-  var btn = document.getElementById('btnSaveDayoffModal');
-  btn.disabled = true;
-  btn.innerText = "Menyimpan...";
-
-  var payload = {
-    id: document.getElementById('doId').value,
-    judul: document.getElementById('doJudul').value,
-    startTime: document.getElementById('doStartTime').value,
-    endTime: document.getElementById('doEndTime').value,
-    product: document.getElementById('doProduct').value,
-    level: document.getElementById('doLevel').value,
-    category: document.getElementById('doCategory').value,
-    taskType: document.getElementById('doTaskType').value,
-    taskDesc: document.getElementById('doTaskDesc').value
-  };
-
-  google.script.run
-    .withSuccessHandler(function(res) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Aktivitas";
-      closeModal('modalDayoff');
-      showToast(res.message);
-      loadDayoffData();
-    })
-    .withFailureHandler(function(err) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Aktivitas";
-      alert("Gagal: " + err.message);
-    })
-    .saveDayoffData(payload, currentPin);
-}
-
-function deleteDayoff(id) {
-  if (!confirm("Hapus aktivitas ini dari Hari Kosong?")) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      showToast(res.message);
-      loadDayoffData();
-    })
-    .deleteDayoffData(id, currentPin);
-}
-
-// ==========================================
-// CRUD JADWAL RUTIN (FRONTEND)
-// ==========================================
-function loadRutinData() {
-  google.script.run
-    .withSuccessHandler(renderRutinCards)
-    .withFailureHandler(function(err) { showToast("Gagal memuat jadwal rutin: " + err.message); })
-    .getJadwalRutin(currentPin);
-}
-
-function renderRutinCards(data) {
-  listRutinData = data;
-  var container = document.getElementById('rutinContainer');
-  if (!data || data.length === 0) {
-    container.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:16px;">Belum ada template jadwal. Klik "+ Tambah Jadwal".</div>';
-    return;
+  // ==========================================
+  // CRUD HARI KOSONG (FRONTEND)
+  // ==========================================
+  function loadDayoffData() {
+    google.script.run
+      .withSuccessHandler(renderDayoffCards)
+      .withFailureHandler(function (err) {
+        console.error("Gagal loadDayoffData:", err);
+        alert("Gagal memuat aktivitas hari kosong: " + err.message);
+        var container = document.getElementById('dayoffContainer');
+        if (container) container.innerHTML = '<div style="color:red; text-align:center;">Gagal memuat data.</div>';
+      })
+      .getDayoffData(currentPin);
   }
 
-  var dayOfWeek = new Date().getDay(); // 2: Sel, 3: Rab, 4: Kam, 5: Jum
-  var html = '';
+  function renderDayoffCards(data) {
+    listDayoffData = data || [];
+    var container = document.getElementById('dayoffContainer');
+    if (listDayoffData.length === 0) {
+      container.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:16px;">Belum ada aktivitas. Silakan tambah baru.</div>';
+      return;
+    }
 
-  data.forEach(function(item, idx) {
-    var autoChecked = false;
-    var label = (item.labelHari || '').toUpperCase();
-    if (label.indexOf('SETIAP HARI') !== -1) autoChecked = true;
-    if ((dayOfWeek === 2 || dayOfWeek === 4) && (label.indexOf('SELASA') !== -1 || label.indexOf('KAMIS') !== -1)) autoChecked = true;
-    if (dayOfWeek === 3 && label.indexOf('RABU') !== -1) autoChecked = true;
-    if (dayOfWeek === 5 && label.indexOf('JUMAT') !== -1) autoChecked = true;
+    var html = '';
+    listDayoffData.forEach(function (item, idx) {
+      html += '<div class="schedule-card" style="margin-bottom:12px;">' +
+        '<div class="schedule-info">' +
+        '<span class="schedule-title" style="margin-bottom:4px;">' + item.judul + '</span>' +
+        '<div class="schedule-detail">' + item.startTime + ' - ' + item.endTime + ' • ' + item.product + ' (' + item.taskType + ') • ' + item.taskDesc + '</div>' +
+        '</div>' +
+        '<div class="schedule-actions">' +
+        '<button class="btn-sm" style="background:#E2E8F0; color:var(--text-main);" onclick="editDayoff(' + idx + ')">Edit</button>' +
+        '<button class="btn-sm" style="background:#FEE2E2; color:var(--danger);" onclick="deleteDayoff(\'' + item.id + '\')">Hapus</button>' +
+        '</div>' +
+        '</div>';
+    });
 
-    html += '<div class="schedule-card">' +
-              '<input type="checkbox" id="chkRutin_' + idx + '" ' + (autoChecked ? 'checked' : '') + ' data-idx="' + idx + '">' +
-              '<div class="schedule-info">' +
-                '<span class="schedule-day-badge">' + item.labelHari + '</span>' +
-                '<span class="schedule-title">' + item.judul + '</span>' +
-                '<div class="schedule-detail">' + item.startTime + ' - ' + item.endTime + ' • ' + item.product + ' (' + item.taskType + ') • ' + item.taskDesc + '</div>' +
-              '</div>' +
-              '<div class="schedule-actions">' +
-                '<button class="btn-sm" style="background:#E2E8F0; color:var(--text-main);" onclick="editRutin(' + idx + ')">Edit</button>' +
-                '<button class="btn-sm" style="background:#FEE2E2; color:var(--danger);" onclick="deleteRutin(\'' + item.id + '\')">Hapus</button>' +
-              '</div>' +
-            '</div>';
-  });
-
-  container.innerHTML = html;
-}
-
-function submitBulkSchedule() {
-  var btn = document.getElementById('btnSubmitBulk');
-  var dStr = document.getElementById('bDate').value;
-  var repeatWeeks = parseInt(document.getElementById('bRepeatWeeks').value) || 0;
-  var checkboxes = document.querySelectorAll('#rutinContainer input[type="checkbox"]:checked');
-
-  if (checkboxes.length === 0) {
-    alert("Pilih minimal satu sesi untuk disimpan!");
-    return;
+    container.innerHTML = html;
   }
 
-  var entries = [];
-  
-  // Parse base date
-  var parts = dStr.split('-');
-  var baseDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+  function openModalDayoff() {
+    document.getElementById('modalDayoffTitle').innerText = "Tambah Aktivitas Hari Kosong";
+    document.getElementById('doId').value = "";
+    document.getElementById('formDayoffModal').reset();
+    document.getElementById('modalDayoff').style.display = 'flex';
+  }
 
-  // Cari hari Senin dari baseDateObj sebagai patokan awal minggu
-  var currentDay = baseDateObj.getDay(); // 0 = Minggu, 1 = Senin, ...
-  var diffToMonday = currentDay === 0 ? -6 : -(currentDay - 1);
-  var mondayObj = new Date(baseDateObj.getTime());
-  mondayObj.setDate(mondayObj.getDate() + diffToMonday);
+  function editDayoff(idx) {
+    var item = listDayoffData[idx];
+    document.getElementById('modalDayoffTitle').innerText = "Edit Aktivitas Hari Kosong";
+    document.getElementById('formDayoffModal').reset();
+    document.getElementById('doId').value = item.id;
+    document.getElementById('doJudul').value = item.judul;
+    document.getElementById('doStartTime').value = item.startTime;
+    document.getElementById('doEndTime').value = item.endTime;
+    document.getElementById('doProduct').value = item.product;
+    document.getElementById('doLevel').value = item.level;
+    document.getElementById('doCategory').value = item.category;
+    document.getElementById('doTaskType').value = item.taskType;
+    document.getElementById('doTaskDesc').value = item.taskDesc;
+    document.getElementById('modalDayoff').style.display = 'flex';
+  }
 
-  checkboxes.forEach(function(chk) {
-    var item = listRutinData[chk.getAttribute('data-idx')];
-    
-    // Jika tidak ada data dayIndices (data lama), fallback gunakan currentDay
-    var hasDayIndices = item.dayIndices && item.dayIndices.toString().trim() !== "";
-    var targetDays = hasDayIndices ? item.dayIndices.toString().split(",") : [currentDay.toString()];
-    
-    // Looping berdasarkan minggu (0 = hanya minggu ini)
-    for (var w = 0; w <= repeatWeeks; w++) {
-      targetDays.forEach(function(dayStr) {
-        var dayIndex = parseInt(dayStr); // 0=Minggu, 1=Senin, dll
-        var targetDateObj = new Date(mondayObj.getTime());
-        
-        // Offset dari Senin: Minggu(0)=+6, Senin(1)=+0, Selasa(2)=+1, dst
-        var offsetDayFromMonday = dayIndex === 0 ? 6 : (dayIndex - 1);
-        targetDateObj.setDate(targetDateObj.getDate() + (w * 7) + offsetDayFromMonday);
-        
-        // Skip jika tanggal hasil perhitungan SEBELUM tanggal mulai yang dipilih user
-        // (Guna memastikan jadwal di masa lalu pada minggu pertama tidak ikut terbuat)
-        if (targetDateObj.getTime() < baseDateObj.getTime()) {
-          return; 
-        }
-        
-        var yyyy = targetDateObj.getFullYear();
-        var mm = String(targetDateObj.getMonth() + 1).padStart(2, '0');
-        var dd = String(targetDateObj.getDate()).padStart(2, '0');
-        var targetDateStr = yyyy + "-" + mm + "-" + dd;
+  function saveDayoffModal(e) {
+    e.preventDefault();
+    var btn = document.getElementById('btnSaveDayoffModal');
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
 
-        entries.push({
-          date: targetDateStr, startTime: item.startTime, endTime: item.endTime,
-          product: item.product, level: item.level, category: item.category,
-          taskType: item.taskType, taskDesc: item.taskDesc, status: "Done"
+    var payload = {
+      id: document.getElementById('doId').value,
+      judul: document.getElementById('doJudul').value,
+      startTime: document.getElementById('doStartTime').value,
+      endTime: document.getElementById('doEndTime').value,
+      product: document.getElementById('doProduct').value,
+      level: document.getElementById('doLevel').value,
+      category: document.getElementById('doCategory').value,
+      taskType: document.getElementById('doTaskType').value,
+      taskDesc: document.getElementById('doTaskDesc').value
+    };
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Aktivitas";
+        closeModal('modalDayoff');
+        showToast(res.message);
+        loadDayoffData();
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Aktivitas";
+        alert("Gagal: " + err.message);
+      })
+      .saveDayoffData(payload, currentPin);
+  }
+
+  function deleteDayoff(id) {
+    if (!confirm("Hapus aktivitas ini dari Hari Kosong?")) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        showToast(res.message);
+        loadDayoffData();
+      })
+      .deleteDayoffData(id, currentPin);
+  }
+
+  // ==========================================
+  // CRUD JADWAL RUTIN (FRONTEND)
+  // ==========================================
+  function loadRutinData() {
+    google.script.run
+      .withSuccessHandler(renderRutinCards)
+      .withFailureHandler(function (err) { showToast("Gagal memuat jadwal rutin: " + err.message); })
+      .getJadwalRutin(currentPin);
+  }
+
+  function renderRutinCards(data) {
+    listRutinData = data;
+    var container = document.getElementById('rutinContainer');
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:16px;">Belum ada template jadwal. Klik "+ Tambah Jadwal".</div>';
+      return;
+    }
+
+    var dayOfWeek = new Date().getDay(); // 2: Sel, 3: Rab, 4: Kam, 5: Jum
+    var html = '';
+
+    data.forEach(function (item, idx) {
+      var autoChecked = false;
+      var label = (item.labelHari || '').toUpperCase();
+      if (label.indexOf('SETIAP HARI') !== -1) autoChecked = true;
+      if ((dayOfWeek === 2 || dayOfWeek === 4) && (label.indexOf('SELASA') !== -1 || label.indexOf('KAMIS') !== -1)) autoChecked = true;
+      if (dayOfWeek === 3 && label.indexOf('RABU') !== -1) autoChecked = true;
+      if (dayOfWeek === 5 && label.indexOf('JUMAT') !== -1) autoChecked = true;
+
+      html += '<div class="schedule-card">' +
+        '<input type="checkbox" id="chkRutin_' + idx + '" ' + (autoChecked ? 'checked' : '') + ' data-idx="' + idx + '">' +
+        '<div class="schedule-info">' +
+        '<span class="schedule-day-badge">' + item.labelHari + '</span>' +
+        '<span class="schedule-title">' + item.judul + '</span>' +
+        '<div class="schedule-detail">' + item.startTime + ' - ' + item.endTime + ' • ' + item.product + ' (' + item.taskType + ') • ' + item.taskDesc + '</div>' +
+        '</div>' +
+        '<div class="schedule-actions">' +
+        '<button class="btn-sm" style="background:#E2E8F0; color:var(--text-main);" onclick="editRutin(' + idx + ')">Edit</button>' +
+        '<button class="btn-sm" style="background:#FEE2E2; color:var(--danger);" onclick="deleteRutin(\'' + item.id + '\')">Hapus</button>' +
+        '</div>' +
+        '</div>';
+    });
+
+    container.innerHTML = html;
+  }
+
+  function submitBulkSchedule() {
+    var btn = document.getElementById('btnSubmitBulk');
+    var dStr = document.getElementById('bDate').value;
+    var repeatWeeks = parseInt(document.getElementById('bRepeatWeeks').value) || 0;
+    var checkboxes = document.querySelectorAll('#rutinContainer input[type="checkbox"]:checked');
+
+    if (checkboxes.length === 0) {
+      alert("Pilih minimal satu sesi untuk disimpan!");
+      return;
+    }
+
+    var entries = [];
+
+    // Parse base date
+    var parts = dStr.split('-');
+    var baseDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+
+    // Cari hari Senin dari baseDateObj sebagai patokan awal minggu
+    var currentDay = baseDateObj.getDay(); // 0 = Minggu, 1 = Senin, ...
+    var diffToMonday = currentDay === 0 ? -6 : -(currentDay - 1);
+    var mondayObj = new Date(baseDateObj.getTime());
+    mondayObj.setDate(mondayObj.getDate() + diffToMonday);
+
+    checkboxes.forEach(function (chk) {
+      var item = listRutinData[chk.getAttribute('data-idx')];
+
+      // Jika tidak ada data dayIndices (data lama), fallback gunakan currentDay
+      var hasDayIndices = item.dayIndices && item.dayIndices.toString().trim() !== "";
+      var targetDays = hasDayIndices ? item.dayIndices.toString().split(",") : [currentDay.toString()];
+
+      // Looping berdasarkan minggu (0 = hanya minggu ini)
+      for (var w = 0; w <= repeatWeeks; w++) {
+        targetDays.forEach(function (dayStr) {
+          var dayIndex = parseInt(dayStr); // 0=Minggu, 1=Senin, dll
+          var targetDateObj = new Date(mondayObj.getTime());
+
+          // Offset dari Senin: Minggu(0)=+6, Senin(1)=+0, Selasa(2)=+1, dst
+          var offsetDayFromMonday = dayIndex === 0 ? 6 : (dayIndex - 1);
+          targetDateObj.setDate(targetDateObj.getDate() + (w * 7) + offsetDayFromMonday);
+
+          // Skip jika tanggal hasil perhitungan SEBELUM tanggal mulai yang dipilih user
+          // (Guna memastikan jadwal di masa lalu pada minggu pertama tidak ikut terbuat)
+          if (targetDateObj.getTime() < baseDateObj.getTime()) {
+            return;
+          }
+
+          var yyyy = targetDateObj.getFullYear();
+          var mm = String(targetDateObj.getMonth() + 1).padStart(2, '0');
+          var dd = String(targetDateObj.getDate()).padStart(2, '0');
+          var targetDateStr = yyyy + "-" + mm + "-" + dd;
+
+          entries.push({
+            date: targetDateStr, startTime: item.startTime, endTime: item.endTime,
+            product: item.product, level: item.level, category: item.category,
+            taskType: item.taskType, taskDesc: item.taskDesc, status: "Done"
+          });
         });
+      }
+    });
+
+    btn.disabled = true;
+    btn.innerText = "Menyimpan ke Tracker...";
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Jadwal Tercentang ke Tracker";
+        showToast(res.message);
+        switchView('modeManual');
+        loadDashboard();
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Jadwal Tercentang ke Tracker";
+        alert("Gagal: " + err.message);
+      })
+      .simpanDataTracker(entries, currentPin);
+  }
+
+  function openModalRutin() {
+    document.getElementById('modalRutinTitle').innerText = "Tambah Template Jadwal";
+    document.getElementById('rId').value = "";
+    document.getElementById('formRutinModal').reset();
+    document.getElementById('modalRutin').style.display = 'flex';
+  }
+
+  function editRutin(idx) {
+    var item = listRutinData[idx];
+    document.getElementById('modalRutinTitle').innerText = "Edit Template Jadwal";
+    document.getElementById('formRutinModal').reset();
+    document.getElementById('rId').value = item.id;
+
+    if (item.dayIndices) {
+      var daysArr = item.dayIndices.toString().split(",");
+      var checkboxes = document.querySelectorAll('input[name="rDays"]');
+      checkboxes.forEach(function (chk) {
+        if (daysArr.indexOf(chk.value) !== -1) chk.checked = true;
       });
     }
-  });
 
-  btn.disabled = true;
-  btn.innerText = "Menyimpan ke Tracker...";
-
-  google.script.run
-    .withSuccessHandler(function(res) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Jadwal Tercentang ke Tracker";
-      showToast(res.message);
-      switchView('modeManual');
-      loadDashboard();
-    })
-    .withFailureHandler(function(err) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Jadwal Tercentang ke Tracker";
-      alert("Gagal: " + err.message);
-    })
-    .simpanDataTracker(entries, currentPin);
-}
-
-function openModalRutin() {
-  document.getElementById('modalRutinTitle').innerText = "Tambah Template Jadwal";
-  document.getElementById('rId').value = "";
-  document.getElementById('formRutinModal').reset();
-  document.getElementById('modalRutin').style.display = 'flex';
-}
-
-function editRutin(idx) {
-  var item = listRutinData[idx];
-  document.getElementById('modalRutinTitle').innerText = "Edit Template Jadwal";
-  document.getElementById('formRutinModal').reset();
-  document.getElementById('rId').value = item.id;
-  
-  if (item.dayIndices) {
-    var daysArr = item.dayIndices.toString().split(",");
-    var checkboxes = document.querySelectorAll('input[name="rDays"]');
-    checkboxes.forEach(function(chk) {
-      if (daysArr.indexOf(chk.value) !== -1) chk.checked = true;
-    });
+    document.getElementById('rJudul').value = item.judul;
+    document.getElementById('rStartTime').value = item.startTime;
+    document.getElementById('rEndTime').value = item.endTime;
+    document.getElementById('rProduct').value = item.product;
+    document.getElementById('rLevel').value = item.level;
+    document.getElementById('rCategory').value = item.category;
+    document.getElementById('rTaskType').value = item.taskType;
+    document.getElementById('rTaskDesc').value = item.taskDesc;
+    document.getElementById('modalRutin').style.display = 'flex';
   }
 
-  document.getElementById('rJudul').value = item.judul;
-  document.getElementById('rStartTime').value = item.startTime;
-  document.getElementById('rEndTime').value = item.endTime;
-  document.getElementById('rProduct').value = item.product;
-  document.getElementById('rLevel').value = item.level;
-  document.getElementById('rCategory').value = item.category;
-  document.getElementById('rTaskType').value = item.taskType;
-  document.getElementById('rTaskDesc').value = item.taskDesc;
-  document.getElementById('modalRutin').style.display = 'flex';
-}
+  function saveRutinModal(e) {
+    e.preventDefault();
 
-function saveRutinModal(e) {
-  e.preventDefault();
-
-  var checkedDays = document.querySelectorAll('input[name="rDays"]:checked');
-  if (checkedDays.length === 0) {
-    alert("Silakan pilih minimal satu hari!");
-    return;
-  }
-
-  var dayIndicesArr = [];
-  var dayNamesMap = {"1":"Senin", "2":"Selasa", "3":"Rabu", "4":"Kamis", "5":"Jumat", "6":"Sabtu", "0":"Minggu"};
-  var dayNamesArr = [];
-  
-  checkedDays.forEach(function(chk) {
-    dayIndicesArr.push(chk.value);
-    dayNamesArr.push(dayNamesMap[chk.value]);
-  });
-
-  var btn = document.getElementById('btnSaveRutinModal');
-  btn.disabled = true;
-  btn.innerText = "Menyimpan...";
-
-  var payload = {
-    id: document.getElementById('rId').value,
-    labelHari: dayNamesArr.join(", "),
-    dayIndices: dayIndicesArr.join(","),
-    judul: document.getElementById('rJudul').value,
-    startTime: document.getElementById('rStartTime').value,
-    endTime: document.getElementById('rEndTime').value,
-    product: document.getElementById('rProduct').value,
-    level: document.getElementById('rLevel').value,
-    category: document.getElementById('rCategory').value,
-    taskType: document.getElementById('rTaskType').value,
-    taskDesc: document.getElementById('rTaskDesc').value
-  };
-
-  google.script.run
-    .withSuccessHandler(function(res) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Template";
-      closeModal('modalRutin');
-      showToast(res.message);
-      loadRutinData();
-    })
-    .withFailureHandler(function(err) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Template";
-      alert("Gagal: " + err.message);
-    })
-    .saveJadwalRutin(payload, currentPin);
-}
-
-function deleteRutin(id) {
-  if (!confirm("Hapus template jadwal ini dari Spreadsheet?")) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      showToast(res.message);
-      loadRutinData();
-    })
-    .deleteJadwalRutin(id, currentPin);
-}
-
-function closeModal(id) {
-  document.getElementById(id).style.display = 'none';
-}
-
-
-// ==========================================
-// CRUD KELAS / TASK DESC (FRONTEND)
-// ==========================================
-function loadKelasData() {
-  google.script.run
-    .withSuccessHandler(function(data) {
-      listKelasData = data;
-      renderKelasCards();
-      renderDynamicChips();
-    })
-    .withFailureHandler(function(err) { showToast("Gagal memuat kelas: " + err.message); })
-    .getKelasConfig(currentPin);
-}
-
-function renderDynamicChips() {
-  var container = document.getElementById('dynamicChipsContainer');
-  if (!listKelasData || listKelasData.length === 0) {
-    container.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted);">Belum ada daftar kelas. Silakan tambah di menu Kelola Kelas.</div>';
-    return;
-  }
-  
-  // Group by categoryTitle
-  var groups = {};
-  listKelasData.forEach(function(item) {
-    var cat = item.categoryTitle || 'Lainnya';
-    if(!groups[cat]) groups[cat] = [];
-    groups[cat].push(item);
-  });
-  
-  var html = '';
-  for (var cat in groups) {
-    html += '<div class="chip-category-title">' + cat + '</div>';
-    groups[cat].forEach(function(item) {
-      html += '<button type="button" class="chip-btn" onclick="setDesc(\'' + 
-              item.taskDesc + '\', \'' + item.product + '\', \'' + item.category + '\', \'' + 
-              item.taskType + '\', \'' + item.level + '\')">' + item.labelButton + '</button>';
-    });
-  }
-  container.innerHTML = html;
-}
-
-function renderKelasCards() {
-  var container = document.getElementById('kelasContainer');
-  if (!listKelasData || listKelasData.length === 0) {
-    container.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:16px;">Belum ada kelas tersimpan. Klik "+ Tambah Kelas".</div>';
-    return;
-  }
-  var html = '';
-  listKelasData.forEach(function(item, idx) {
-    html += '<div class="schedule-card" style="display:flex; justify-content:space-between;">' +
-              '<div>' +
-                '<div style="font-weight:700; font-size:0.88rem; color:var(--ea-navy);">' + item.labelButton + '</div>' +
-                '<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">' + 
-                   item.categoryTitle + ' • ' + item.product + ' • Desc: ' + item.taskDesc + 
-                '</div>' +
-              '</div>' +
-              '<div class="schedule-actions">' +
-                '<button class="btn-sm" style="background:#E2E8F0; color:var(--text-main);" onclick="editKelas(' + idx + ')">Edit</button>' +
-                '<button class="btn-sm" style="background:#FEE2E2; color:var(--danger);" onclick="deleteKelas(\'' + item.id + '\')">Hapus</button>' +
-              '</div>' +
-            '</div>';
-  });
-  container.innerHTML = html;
-}
-
-function openModalKelas() {
-  document.getElementById('modalKelasTitle').innerText = "Tambah Kelas / Task Desc";
-  document.getElementById('kId').value = "";
-  document.getElementById('formKelasModal').reset();
-  document.getElementById('modalKelas').style.display = 'flex';
-}
-
-function editKelas(idx) {
-  var item = listKelasData[idx];
-  document.getElementById('modalKelasTitle').innerText = "Edit Kelas / Task Desc";
-  document.getElementById('kId').value = item.id;
-  document.getElementById('kCategoryTitle').value = item.categoryTitle;
-  document.getElementById('kLabelButton').value = item.labelButton;
-  document.getElementById('kProduct').value = item.product;
-  document.getElementById('kCategory').value = item.category;
-  document.getElementById('kTaskType').value = item.taskType;
-  document.getElementById('kLevel').value = item.level;
-  document.getElementById('kTaskDesc').value = item.taskDesc;
-  document.getElementById('modalKelas').style.display = 'flex';
-}
-
-function saveKelasModal(e) {
-  e.preventDefault();
-  var btn = document.getElementById('btnSaveKelasModal');
-  btn.disabled = true;
-  btn.innerText = "Menyimpan...";
-
-  var payload = {
-    id: document.getElementById('kId').value,
-    categoryTitle: document.getElementById('kCategoryTitle').value,
-    labelButton: document.getElementById('kLabelButton').value,
-    product: document.getElementById('kProduct').value,
-    category: document.getElementById('kCategory').value,
-    taskType: document.getElementById('kTaskType').value,
-    level: document.getElementById('kLevel').value,
-    taskDesc: document.getElementById('kTaskDesc').value
-  };
-
-  google.script.run
-    .withSuccessHandler(function(res) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Kelas";
-      closeModal('modalKelas');
-      showToast(res.message);
-      loadKelasData();
-    })
-    .withFailureHandler(function(err) {
-      btn.disabled = false;
-      btn.innerText = "Simpan Kelas";
-      alert("Gagal: " + err.message);
-    })
-    .saveKelas(payload, currentPin);
-}
-
-function deleteKelas(id) {
-  if (!confirm("Hapus kelas ini?")) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      showToast(res.message);
-      loadKelasData();
-    })
-    .deleteKelas(id, currentPin);
-}
-// ==========================================
-// DATABASE TRACKER (Frontend Logic)
-// ==========================================
-var fullDatabase = [];
-var filteredDatabase = [];
-var currentPage = 1;
-var rowsPerPage = 20;
-
-function loadDatabase() {
-  var tbody = document.getElementById('dbTableBody');
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Memuat data dari Spreadsheet...</td></tr>';
-  
-  google.script.run
-    .withSuccessHandler(function(data) {
-      fullDatabase = data;
-      filterDatabase(); // Jalankan filter dan render tabel
-    })
-    .withFailureHandler(function(err) {
-      showToast("Gagal memuat database: " + err.message);
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Gagal memuat data.</td></tr>';
-    })
-    .getAllTrackerData(currentPin);
-}
-
-function filterDatabase() {
-  var search = document.getElementById('dbSearch').value.toLowerCase();
-  var month = document.getElementById('dbMonthFilter').value;
-  var product = document.getElementById('dbProductFilter').value;
-  var category = document.getElementById('dbCategoryFilter').value;
-  var status = document.getElementById('dbStatusFilter').value;
-  
-  var startDateStr = document.getElementById('dbStartDate').value;
-  var endDateStr = document.getElementById('dbEndDate').value;
-  
-  var startUnix = 0;
-  var endUnix = 9999999999999;
-  
-  if (startDateStr) {
-    var parts = startDateStr.split('-');
-    startUnix = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0).getTime();
-  }
-  if (endDateStr) {
-    var parts = endDateStr.split('-');
-    endUnix = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59).getTime();
-  }
-
-  var totalWorkingHours = 0;
-  var totalTeachingHours = 0;
-
-  filteredDatabase = fullDatabase.filter(function(row) {
-    // 1. Waktu
-    if (row.unixTime < startUnix || row.unixTime > endUnix) return false;
-    
-    // 2. Bulan
-    if (month && row.month !== month) return false;
-    
-    // 3. Dropdowns
-    if (product && row.product !== product) return false;
-    if (category && row.category !== category) return false;
-    if (status && row.status !== status) return false;
-    
-    // 4. Pencarian Teks (Cari di semua kolom)
-    if (search) {
-      var rowStr = (row.date + " " + row.product + " " + row.category + " " + row.taskType + " " + row.taskDesc).toLowerCase();
-      if (rowStr.indexOf(search) === -1) return false;
+    var checkedDays = document.querySelectorAll('input[name="rDays"]:checked');
+    if (checkedDays.length === 0) {
+      alert("Silakan pilih minimal satu hari!");
+      return;
     }
 
-    // Jika lolos semua filter, hitung statistiknya
-    totalWorkingHours += row.duration;
-    if (row.taskType === 'Teaching') {
-      totalTeachingHours += row.duration;
+    var dayIndicesArr = [];
+    var dayNamesMap = { "1": "Senin", "2": "Selasa", "3": "Rabu", "4": "Kamis", "5": "Jumat", "6": "Sabtu", "0": "Minggu" };
+    var dayNamesArr = [];
+
+    checkedDays.forEach(function (chk) {
+      dayIndicesArr.push(chk.value);
+      dayNamesArr.push(dayNamesMap[chk.value]);
+    });
+
+    var btn = document.getElementById('btnSaveRutinModal');
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
+
+    var payload = {
+      id: document.getElementById('rId').value,
+      labelHari: dayNamesArr.join(", "),
+      dayIndices: dayIndicesArr.join(","),
+      judul: document.getElementById('rJudul').value,
+      startTime: document.getElementById('rStartTime').value,
+      endTime: document.getElementById('rEndTime').value,
+      product: document.getElementById('rProduct').value,
+      level: document.getElementById('rLevel').value,
+      category: document.getElementById('rCategory').value,
+      taskType: document.getElementById('rTaskType').value,
+      taskDesc: document.getElementById('rTaskDesc').value
+    };
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Template";
+        closeModal('modalRutin');
+        showToast(res.message);
+        loadRutinData();
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Template";
+        alert("Gagal: " + err.message);
+      })
+      .saveJadwalRutin(payload, currentPin);
+  }
+
+  function deleteRutin(id) {
+    if (!confirm("Hapus template jadwal ini dari Spreadsheet?")) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        showToast(res.message);
+        loadRutinData();
+      })
+      .deleteJadwalRutin(id, currentPin);
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+
+  // ==========================================
+  // CRUD KELAS / TASK DESC (FRONTEND)
+  // ==========================================
+  function loadKelasData() {
+    google.script.run
+      .withSuccessHandler(function (data) {
+        listKelasData = data;
+        renderKelasCards();
+        renderDynamicChips();
+      })
+      .withFailureHandler(function (err) { showToast("Gagal memuat kelas: " + err.message); })
+      .getKelasConfig(currentPin);
+  }
+
+  function renderDynamicChips() {
+    var container = document.getElementById('dynamicChipsContainer');
+    if (!listKelasData || listKelasData.length === 0) {
+      container.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted);">Belum ada daftar kelas. Silakan tambah di menu Kelola Kelas.</div>';
+      return;
     }
 
-    return true;
-  });
+    // Group by categoryTitle
+    var groups = {};
+    listKelasData.forEach(function (item) {
+      var cat = item.categoryTitle || 'Lainnya';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    });
 
-  // Update UI Stats
-  var finalW = Math.round(totalWorkingHours * 10) / 10;
-  var finalT = Math.round(totalTeachingHours * 10) / 10;
-  document.getElementById('dbWorkingHoursText').innerText = finalW + " jam";
-  document.getElementById('dbTeachingHoursText').innerText = finalT + " jam";
-
-  // Hitung jumlah minggu unik dalam data yang sedang difilter
-  var uniqueWeeks = new Set();
-  filteredDatabase.forEach(function(row) {
-    var d = new Date(row.unixTime);
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-    var week1 = new Date(d.getFullYear(), 0, 4);
-    var weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-    uniqueWeeks.add(d.getFullYear() + "-W" + weekNum);
-  });
-  
-  var numWeeks = uniqueWeeks.size || 1;
-  var targetW = numWeeks * 30;
-  var targetT = numWeeks * 18;
-
-  // Insight Dinamis (Berdasarkan Target Kumulatif)
-  var insightW = document.getElementById('dbInsightWorking');
-  var insightT = document.getElementById('dbInsightTeaching');
-
-  if (finalW >= targetW) {
-    var surplusW = (finalW - targetW).toFixed(1);
-    insightW.innerHTML = '<span class="insight-success">Target tercapai!</span> ' + (surplusW > 0 ? 'Kelebihan <span style="font-weight:700;">' + surplusW + ' jam</span>.' : 'Pas sesuai target.');
-  } else if (finalW > 0) {
-    var deficitW = (targetW - finalW).toFixed(1);
-    insightW.innerHTML = '<span class="insight-warning">Belum tercapai.</span> Kurang <span style="font-weight:700;">' + deficitW + ' jam</span> lagi dari target (' + targetW + 'j).';
-  } else {
-    insightW.innerHTML = '<span style="color:#94a3b8;">Belum ada data kerja di rentang ini.</span>';
+    var html = '';
+    for (var cat in groups) {
+      html += '<div class="chip-category-title">' + cat + '</div>';
+      groups[cat].forEach(function (item) {
+        html += '<button type="button" class="chip-btn" onclick="setDesc(\'' +
+          item.taskDesc + '\', \'' + item.product + '\', \'' + item.category + '\', \'' +
+          item.taskType + '\', \'' + item.level + '\')">' + item.labelButton + '</button>';
+      });
+    }
+    container.innerHTML = html;
   }
 
-  if (finalT >= targetT) {
-    var surplusT = (finalT - targetT).toFixed(1);
-    insightT.innerHTML = '<span class="insight-success">Target tercapai!</span> ' + (surplusT > 0 ? 'Kelebihan <span style="font-weight:700;">' + surplusT + ' jam</span>.' : 'Pas sesuai target.');
-  } else if (finalT > 0) {
-    var deficitT = (targetT - finalT).toFixed(1);
-    insightT.innerHTML = '<span class="insight-warning">Belum tercapai.</span> Kurang <span style="font-weight:700;">' + deficitT + ' jam</span> lagi dari target (' + targetT + 'j).';
-  } else {
-    insightT.innerHTML = '<span style="color:#94a3b8;">Belum ada data mengajar di rentang ini.</span>';
+  function renderKelasCards() {
+    var container = document.getElementById('kelasContainer');
+    if (!listKelasData || listKelasData.length === 0) {
+      container.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:16px;">Belum ada kelas tersimpan. Klik "+ Tambah Kelas".</div>';
+      return;
+    }
+    var html = '';
+    listKelasData.forEach(function (item, idx) {
+      html += '<div class="schedule-card" style="display:flex; justify-content:space-between;">' +
+        '<div>' +
+        '<div style="font-weight:700; font-size:0.88rem; color:var(--ea-navy);">' + item.labelButton + '</div>' +
+        '<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">' +
+        item.categoryTitle + ' • ' + item.product + ' • Desc: ' + item.taskDesc +
+        '</div>' +
+        '</div>' +
+        '<div class="schedule-actions">' +
+        '<button class="btn-sm" style="background:#E2E8F0; color:var(--text-main);" onclick="editKelas(' + idx + ')">Edit</button>' +
+        '<button class="btn-sm" style="background:#FEE2E2; color:var(--danger);" onclick="deleteKelas(\'' + item.id + '\')">Hapus</button>' +
+        '</div>' +
+        '</div>';
+    });
+    container.innerHTML = html;
   }
 
-  currentPage = 1;
-  renderTable();
-}
-
-function renderTable() {
-  var tbody = document.getElementById('dbTableBody');
-  if (filteredDatabase.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Tidak ada data yang cocok.</td></tr>';
-    document.getElementById('txtPageInfo').innerText = "Page 1 of 1";
-    document.getElementById('btnPrevPage').disabled = true;
-    document.getElementById('btnNextPage').disabled = true;
-    return;
+  function openModalKelas() {
+    document.getElementById('modalKelasTitle').innerText = "Tambah Kelas / Task Desc";
+    document.getElementById('kId').value = "";
+    document.getElementById('formKelasModal').reset();
+    document.getElementById('modalKelas').style.display = 'flex';
   }
 
-  var totalPages = Math.ceil(filteredDatabase.length / rowsPerPage);
-  if (currentPage > totalPages) currentPage = totalPages;
-  if (currentPage < 1) currentPage = 1;
+  function editKelas(idx) {
+    var item = listKelasData[idx];
+    document.getElementById('modalKelasTitle').innerText = "Edit Kelas / Task Desc";
+    document.getElementById('kId').value = item.id;
+    document.getElementById('kCategoryTitle').value = item.categoryTitle;
+    document.getElementById('kLabelButton').value = item.labelButton;
+    document.getElementById('kProduct').value = item.product;
+    document.getElementById('kCategory').value = item.category;
+    document.getElementById('kTaskType').value = item.taskType;
+    document.getElementById('kLevel').value = item.level;
+    document.getElementById('kTaskDesc').value = item.taskDesc;
+    document.getElementById('modalKelas').style.display = 'flex';
+  }
 
-  var startIndex = (currentPage - 1) * rowsPerPage;
-  var endIndex = startIndex + rowsPerPage;
-  var pageData = filteredDatabase.slice(startIndex, endIndex);
+  function saveKelasModal(e) {
+    e.preventDefault();
+    var btn = document.getElementById('btnSaveKelasModal');
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
 
-  var html = '';
-  pageData.forEach(function(row) {
-    var badgeClass = "";
-    if (row.status === "Done") badgeClass = "status-done";
-    else if (row.status === "On progress") badgeClass = "status-progress";
-    else if (row.status === "Cancelled") badgeClass = "status-cancelled";
+    var payload = {
+      id: document.getElementById('kId').value,
+      categoryTitle: document.getElementById('kCategoryTitle').value,
+      labelButton: document.getElementById('kLabelButton').value,
+      product: document.getElementById('kProduct').value,
+      category: document.getElementById('kCategory').value,
+      taskType: document.getElementById('kTaskType').value,
+      level: document.getElementById('kLevel').value,
+      taskDesc: document.getElementById('kTaskDesc').value
+    };
 
-    html += '<tr>' +
-      '<td style="white-space:nowrap; font-weight:600;">' + row.date + '</td>' +
-      '<td style="white-space:nowrap; font-size:0.75rem;">' + row.startTime + ' - ' + row.endTime + '</td>' +
-      '<td>' + row.duration + 'j</td>' +
-      '<td><span style="background:#F1F5F9; padding:4px 8px; border-radius:6px; border: 1px solid #E2E8F0; font-size:0.75rem; font-weight:700;">' + row.product + '</span></td>' +
-      '<td style="font-size:0.78rem;">' + row.category + '</td>' +
-      '<td style="font-size:0.78rem;">' + row.taskType + '</td>' +
-      '<td>' + row.taskDesc + '</td>' +
-      '<td><span class="status-badge ' + badgeClass + '">' + row.status + '</span></td>' +
-    '</tr>';
-  });
+    google.script.run
+      .withSuccessHandler(function (res) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Kelas";
+        closeModal('modalKelas');
+        showToast(res.message);
+        loadKelasData();
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false;
+        btn.innerText = "Simpan Kelas";
+        alert("Gagal: " + err.message);
+      })
+      .saveKelas(payload, currentPin);
+  }
 
-  tbody.innerHTML = html;
+  function deleteKelas(id) {
+    if (!confirm("Hapus kelas ini?")) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        showToast(res.message);
+        loadKelasData();
+      })
+      .deleteKelas(id, currentPin);
+  }
+  // ==========================================
+  // DATABASE TRACKER (Frontend Logic)
+  // ==========================================
+  var fullDatabase = [];
+  var filteredDatabase = [];
+  var currentPage = 1;
+  var rowsPerPage = 20;
 
-  document.getElementById('txtPageInfo').innerText = "Page " + currentPage + " of " + totalPages;
-  document.getElementById('btnPrevPage').disabled = (currentPage === 1);
-  document.getElementById('btnNextPage').disabled = (currentPage === totalPages);
-}
+  function loadDatabase() {
+    var tbody = document.getElementById('dbTableBody');
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Memuat data dari Spreadsheet...</td></tr>';
 
-function changePage(delta) {
-  currentPage += delta;
-  renderTable();
-}
+    google.script.run
+      .withSuccessHandler(function (data) {
+        fullDatabase = data;
+        filterDatabase(); // Jalankan filter dan render tabel
+      })
+      .withFailureHandler(function (err) {
+        showToast("Gagal memuat database: " + err.message);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:red;">Gagal memuat data.</td></tr>';
+      })
+      .getAllTrackerData(currentPin);
+  }
 
+  function filterDatabase() {
+    var search = document.getElementById('dbSearch').value.toLowerCase();
+    var month = document.getElementById('dbMonthFilter').value;
+    var product = document.getElementById('dbProductFilter').value;
+    var category = document.getElementById('dbCategoryFilter').value;
+    var status = document.getElementById('dbStatusFilter').value;
+
+    var startDateStr = document.getElementById('dbStartDate').value;
+    var endDateStr = document.getElementById('dbEndDate').value;
+
+    var startUnix = 0;
+    var endUnix = 9999999999999;
+
+    if (startDateStr) {
+      var parts = startDateStr.split('-');
+      startUnix = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0).getTime();
+    }
+    if (endDateStr) {
+      var parts = endDateStr.split('-');
+      endUnix = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59).getTime();
+    }
+
+    var totalWorkingHours = 0;
+    var totalTeachingHours = 0;
+
+    filteredDatabase = fullDatabase.filter(function (row) {
+      // 1. Waktu
+      if (row.unixTime < startUnix || row.unixTime > endUnix) return false;
+
+      // 2. Bulan
+      if (month && row.month !== month) return false;
+
+      // 3. Dropdowns
+      if (product && row.product !== product) return false;
+      if (category && row.category !== category) return false;
+      if (status && row.status !== status) return false;
+
+      // 4. Pencarian Teks (Cari di semua kolom)
+      if (search) {
+        var rowStr = (row.date + " " + row.product + " " + row.category + " " + row.taskType + " " + row.taskDesc).toLowerCase();
+        if (rowStr.indexOf(search) === -1) return false;
+      }
+
+      // Jika lolos semua filter, hitung statistiknya
+      totalWorkingHours += row.duration;
+      if (row.taskType === 'Teaching') {
+        totalTeachingHours += row.duration;
+      }
+
+      return true;
+    });
+
+    // Update UI Stats
+    var finalW = Math.round(totalWorkingHours * 10) / 10;
+    var finalT = Math.round(totalTeachingHours * 10) / 10;
+    document.getElementById('dbWorkingHoursText').innerText = finalW + " jam";
+    document.getElementById('dbTeachingHoursText').innerText = finalT + " jam";
+
+    // Hitung jumlah minggu unik dalam data yang sedang difilter
+    var uniqueWeeks = new Set();
+    filteredDatabase.forEach(function (row) {
+      var d = new Date(row.unixTime);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+      var week1 = new Date(d.getFullYear(), 0, 4);
+      var weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+      uniqueWeeks.add(d.getFullYear() + "-W" + weekNum);
+    });
+
+    var numWeeks = uniqueWeeks.size || 1;
+    var targetW = numWeeks * 30;
+    var targetT = numWeeks * 18;
+
+    // Insight Dinamis (Berdasarkan Target Kumulatif)
+    var insightW = document.getElementById('dbInsightWorking');
+    var insightT = document.getElementById('dbInsightTeaching');
+
+    if (finalW >= targetW) {
+      var surplusW = (finalW - targetW).toFixed(1);
+      insightW.innerHTML = '<span class="insight-success">Target tercapai!</span> ' + (surplusW > 0 ? 'Kelebihan <span style="font-weight:700;">' + surplusW + ' jam</span>.' : 'Pas sesuai target.');
+    } else if (finalW > 0) {
+      var deficitW = (targetW - finalW).toFixed(1);
+      insightW.innerHTML = '<span class="insight-warning">Belum tercapai.</span> Kurang <span style="font-weight:700;">' + deficitW + ' jam</span> lagi dari target (' + targetW + 'j).';
+    } else {
+      insightW.innerHTML = '<span style="color:#94a3b8;">Belum ada data kerja di rentang ini.</span>';
+    }
+
+    if (finalT >= targetT) {
+      var surplusT = (finalT - targetT).toFixed(1);
+      insightT.innerHTML = '<span class="insight-success">Target tercapai!</span> ' + (surplusT > 0 ? 'Kelebihan <span style="font-weight:700;">' + surplusT + ' jam</span>.' : 'Pas sesuai target.');
+    } else if (finalT > 0) {
+      var deficitT = (targetT - finalT).toFixed(1);
+      insightT.innerHTML = '<span class="insight-warning">Belum tercapai.</span> Kurang <span style="font-weight:700;">' + deficitT + ' jam</span> lagi dari target (' + targetT + 'j).';
+    } else {
+      insightT.innerHTML = '<span style="color:#94a3b8;">Belum ada data mengajar di rentang ini.</span>';
+    }
+
+    currentPage = 1;
+    renderTable();
+  }
+
+  function renderTable() {
+    var tbody = document.getElementById('dbTableBody');
+    if (filteredDatabase.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Tidak ada data yang cocok.</td></tr>';
+      document.getElementById('txtPageInfo').innerText = "Page 1 of 1";
+      document.getElementById('btnPrevPage').disabled = true;
+      document.getElementById('btnNextPage').disabled = true;
+      return;
+    }
+
+    var totalPages = Math.ceil(filteredDatabase.length / rowsPerPage);
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    var startIndex = (currentPage - 1) * rowsPerPage;
+    var endIndex = startIndex + rowsPerPage;
+    var pageData = filteredDatabase.slice(startIndex, endIndex);
+
+    var html = '';
+    pageData.forEach(function (row) {
+      var badgeClass = "";
+      if (row.status === "Done") badgeClass = "status-done";
+      else if (row.status === "On progress") badgeClass = "status-progress";
+      else if (row.status === "Cancelled") badgeClass = "status-cancelled";
+
+      html += '<tr>' +
+        '<td style="white-space:nowrap; font-weight:600;">' + row.date + '</td>' +
+        '<td style="white-space:nowrap; font-size:0.75rem;">' + row.startTime + ' - ' + row.endTime + '</td>' +
+        '<td>' + row.duration + 'j</td>' +
+        '<td><span style="background:#F1F5F9; padding:4px 8px; border-radius:6px; border: 1px solid #E2E8F0; font-size:0.75rem; font-weight:700;">' + row.product + '</span></td>' +
+        '<td style="font-size:0.78rem;">' + row.category + '</td>' +
+        '<td style="font-size:0.78rem;">' + row.taskType + '</td>' +
+        '<td>' + row.taskDesc + '</td>' +
+        '<td><span class="status-badge ' + badgeClass + '">' + row.status + '</span></td>' +
+        '<td style="text-align:center;">' +
+        '<div style="display:flex; justify-content:center; gap:8px;">' +
+        '<span onclick="editSessionFromDb(' + row.rowIndex + ')" style="cursor:pointer; color:var(--primary);" title="Edit">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>' +
+        '</span>' +
+        '<span onclick="deleteSessionFromDb(' + row.rowIndex + ')" style="cursor:pointer; color:var(--danger);" title="Hapus">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>' +
+        '</span>' +
+        '</div>' +
+        '</td>' +
+        '</tr>';
+    });
+
+    tbody.innerHTML = html;
+
+    document.getElementById('txtPageInfo').innerText = "Page " + currentPage + " of " + totalPages;
+    document.getElementById('btnPrevPage').disabled = (currentPage === 1);
+    document.getElementById('btnNextPage').disabled = (currentPage === totalPages);
+  }
+
+  function changePage(delta) {
+    currentPage += delta;
+    renderTable();
+  }
+
+  function deleteSessionFromDb(rowIndex) {
+    if (!confirm("Apakah Anda yakin ingin menghapus data ini dari Database?")) return;
+    showToast("Menghapus data...");
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res.status === 'error') { alert(res.message); return; }
+        showToast(res.message);
+        loadDatabase();
+        fetchDashboardStats();
+      })
+      .withFailureHandler(function (err) {
+        alert("Gagal menghapus: " + err.message);
+      })
+      .hapusBarisTracker(rowIndex, currentPin);
+  }
+
+  function editSessionFromDb(rowIndex) {
+    var item = fullDatabase.find(function (row) { return row.rowIndex === rowIndex; });
+    if (!item) return;
+
+    editingRowIndex = item.rowIndex;
+
+    var d = new Date(item.unixTime);
+    var dStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+
+    document.getElementById('mDate').value = dStr;
+    document.getElementById('mStartTime').value = item.startTime || '';
+    document.getElementById('mEndTime').value = item.endTime || '';
+    document.getElementById('mProduct').value = item.product || 'EAC';
+    document.getElementById('mCategory').value = item.category || '';
+    document.getElementById('mLevel').value = item.level || '';
+    document.getElementById('mTaskType').value = item.taskType || '';
+    document.getElementById('mDesc').value = item.taskDesc || '';
+
+    var btn = document.getElementById('btnSubmitManual');
+    btn.innerText = "Simpan Perubahan";
+
+    if (!document.getElementById('btnCancelEdit')) {
+      var cancelBtn = document.createElement('button');
+      cancelBtn.id = 'btnCancelEdit';
+      cancelBtn.className = 'btn-outline';
+      cancelBtn.style.marginTop = '12px';
+      cancelBtn.style.width = '100%';
+      cancelBtn.innerText = "Batal Edit";
+      cancelBtn.onclick = cancelEdit;
+      btn.parentNode.insertBefore(cancelBtn, btn.nextSibling);
+    }
+    document.getElementById('btnCancelEdit').style.display = 'block';
+
+    switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+  }
+
+
+  // ==========================================
+  // KONFIGURASI (CONFIG)
+  // ==========================================
+  function loadConfigData() {
+    var btn = document.getElementById('btnSubmitConfig');
+    btn.innerText = "Memuat data...";
+    btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function(config) {
+        document.getElementById('configUrlInput').value = config.url;
+        document.getElementById('configPinInput').value = '';
+        document.getElementById('configDbUrl').value = config.personalDbUrl;
+        btn.innerText = "Simpan Perubahan";
+        btn.disabled = false;
+      })
+      .withFailureHandler(function(err) {
+        showToast("Gagal memuat konfigurasi: " + err.message);
+        btn.innerText = "Simpan Perubahan";
+        btn.disabled = false;
+      })
+      .getFullAppConfig(currentPin);
+  }
+
+  function submitConfig() {
+    var url = document.getElementById('configUrlInput').value.trim();
+    var pin = document.getElementById('configPinInput').value;
+    var msgEl = document.getElementById('configMessage');
+    var btn = document.getElementById('btnSubmitConfig');
+
+    if (!url) {
+      msgEl.innerText = "URL Spreadsheet tidak boleh kosong.";
+      msgEl.style.color = "red";
+      msgEl.style.display = "block";
+      return;
+    }
+
+    var finalPin = currentPin; // Default keep current PIN if input is empty
+    if (pin) {
+      if (pin.length !== 4) {
+        msgEl.innerText = "PIN harus 4 digit!";
+        msgEl.style.color = "red";
+        msgEl.style.display = "block";
+        return;
+      }
+      finalPin = pin;
+    }
+
+    btn.innerText = "Menyimpan...";
+    btn.disabled = true;
+    msgEl.style.display = "none";
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.status === 'success') {
+          currentPin = finalPin;
+          document.getElementById('configPinInput').value = '';
+          msgEl.innerText = "Konfigurasi berhasil disimpan!";
+          msgEl.style.color = "green";
+          msgEl.style.display = "block";
+          showToast("Konfigurasi diperbarui.");
+        } else {
+          msgEl.innerText = res.message;
+          msgEl.style.color = "red";
+          msgEl.style.display = "block";
+        }
+        btn.innerText = "Simpan Perubahan";
+        btn.disabled = false;
+      })
+      .withFailureHandler(function(err) {
+        msgEl.innerText = "Terjadi kesalahan: " + err.message;
+        msgEl.style.color = "red";
+        msgEl.style.display = "block";
+        btn.innerText = "Simpan Perubahan";
+        btn.disabled = false;
+      })
+      .saveAppSetup(url, finalPin);
+  }
+
+  function copyDbUrl() {
+    var copyText = document.getElementById("configDbUrl");
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(copyText.value);
+    showToast("URL berhasil disalin!");
+  }
 </script>
