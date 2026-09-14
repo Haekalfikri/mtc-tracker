@@ -3,11 +3,16 @@
   var listRutinData = [];
   var listKelasData = [];
   var listDayoffData = [];
+  function getLocalDateString() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+  }
+  
   var todayLogsData = [];
   var editingRowIndex = null;
 
   window.onload = function () {
-    var today = new Date().toISOString().split('T')[0];
+    var today = getLocalDateString();
     document.getElementById('mDate').value = today;
     document.getElementById('doDate').value = today;
     document.getElementById('bDate').value = today;
@@ -79,6 +84,7 @@
           currentPin = pin;
           document.getElementById('pinOverlay').style.display = 'none';
           document.getElementById('appContent').style.display = 'flex';
+          fetchDropdownOptions();
           loadDashboard();
           loadRutinData();
           loadKelasData();
@@ -121,13 +127,13 @@
     var fullWidthModes = ['modeDatabase', 'modeKelas', 'modeConfig'];
     var stickyPanel = document.querySelector('.sticky-panel');
     var mainGrid = document.querySelector('.main-grid');
-    
+
     if (fullWidthModes.includes(viewId)) {
-      if(stickyPanel) stickyPanel.style.display = 'none';
-      if(mainGrid) mainGrid.style.display = 'block';
+      if (stickyPanel) stickyPanel.style.display = 'none';
+      if (mainGrid) mainGrid.style.display = 'block';
     } else {
-      if(stickyPanel) stickyPanel.style.display = 'block';
-      if(mainGrid) mainGrid.style.display = ''; // revert to CSS grid
+      if (stickyPanel) stickyPanel.style.display = 'block';
+      if (mainGrid) mainGrid.style.display = ''; // revert to CSS grid
     }
 
     // Close sidebar on mobile after clicking a link
@@ -135,6 +141,57 @@
     if (sidebar && sidebar.classList.contains('open')) {
       sidebar.classList.remove('open');
     }
+  }
+
+  // ==========================================
+  // DYNAMIC DROPDOWNS
+  // ==========================================
+  function fetchDropdownOptions() {
+    google.script.run
+      .withSuccessHandler(function (data) {
+        if (data) populateDropdownOptions(data);
+      })
+      .withFailureHandler(function (err) {
+        console.error("Gagal memuat opsi dropdown:", err);
+        showToast("Gagal memuat opsi dropdown");
+      })
+      .getDropdownOptions(currentPin);
+  }
+
+  function populateDropdownOptions(data) {
+    function fillSelects(selector, optionsList) {
+      var selects = document.querySelectorAll(selector);
+      selects.forEach(function (sel) {
+        var defaultLabel = sel.id.toLowerCase().indexOf('filter') > -1 ? 'Semua' : '- Pilih -';
+        sel.innerHTML = '<option value="">' + defaultLabel + '</option>';
+        if (optionsList && optionsList.length > 0) {
+          optionsList.forEach(function (opt) {
+            var el = document.createElement('option');
+            el.value = opt;
+            el.textContent = opt;
+            sel.appendChild(el);
+          });
+        }
+      });
+    }
+
+    fillSelects('.dyn-product', data["Product"]);
+    fillSelects('.dyn-category', data["Category"]);
+    fillSelects('.dyn-level', data["Level"]);
+    fillSelects('.dyn-tasktype', data["Task Type"]);
+
+    // Status is only populated if data exists, else fallback
+    var statusOpts = (data["Status"] && data["Status"].length > 0) ? data["Status"] : ["Done", "On progress", "Cancelled", "Hold", "Not yet submitted"];
+    fillSelects('.dyn-status', statusOpts);
+
+    // Auto-select "Done" for status fields if "Done" is an option
+    document.querySelectorAll('.dyn-status').forEach(function (sel) {
+      if (sel.id.toLowerCase().indexOf('filter') === -1) { // Skip filter
+        Array.from(sel.options).forEach(function (opt) {
+          if (opt.value === "Done") sel.value = "Done";
+        });
+      }
+    });
   }
 
   // ==========================================
@@ -175,6 +232,19 @@
     }
   }
 
+
+  function resetFormWithStatus(formId) {
+    var frm = document.getElementById(formId);
+    if(frm) {
+      frm.reset();
+      frm.querySelectorAll('.dyn-status').forEach(function (sel) {
+        if (sel.id.toLowerCase().indexOf('filter') === -1) {
+          sel.value = "Done";
+        }
+      });
+    }
+  }
+
   function autoAdjustCategory() {
     autoAdjustTaskTypeFromCategory('mCategory', 'mTaskType');
   }
@@ -186,9 +256,28 @@
   // ==========================================
   // TRACKER & DASHBOARD
   // ==========================================
-  function loadDashboard() {
+  function loadDashboard(srcElement) {
     var dateStr = document.getElementById('mDate').value;
-    document.getElementById('lblLogDate').innerText = dateStr;
+
+    // Sinkronisasi antar input tanggal jika dipicu dari salah satunya
+    if (srcElement && srcElement.value) {
+      dateStr = srcElement.value;
+      if (document.getElementById('mDate')) document.getElementById('mDate').value = dateStr;
+      if (document.getElementById('bDate')) document.getElementById('bDate').value = dateStr;
+      if (document.getElementById('doDate')) document.getElementById('doDate').value = dateStr;
+    }
+
+    // Format tanggal ke Bahasa Indonesia untuk tampilan (Hari, DD Bulan YYYY)
+    var displayDate = dateStr;
+    if (dateStr) {
+      var d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        var days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        displayDate = days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+      }
+    }
+    document.getElementById('lblLogDate').innerText = displayDate;
 
     google.script.run
       .withSuccessHandler(renderDashboard)
@@ -282,6 +371,7 @@
     document.getElementById('mLevel').value = item.level || '';
     document.getElementById('mTaskType').value = item.taskType || '';
     document.getElementById('mDesc').value = item.taskDesc || '';
+    document.getElementById('mStatus').value = item.status || 'Done';
 
     var btn = document.getElementById('btnSubmitManual');
     btn.innerText = "Simpan Perubahan";
@@ -303,8 +393,8 @@
 
   function cancelEdit() {
     editingRowIndex = null;
-    document.getElementById('formManual').reset();
-    var today = new Date().toISOString().split('T')[0];
+    resetFormWithStatus('formManual');
+    var today = getLocalDateString();
     document.getElementById('mDate').value = today;
 
     document.getElementById('btnSubmitManual').innerText = "Submit Tracker";
@@ -335,6 +425,9 @@
     }
   }
   function autoAdjustTaskType() { autoAdjustProduct(); }
+
+
+
   function autoAdjustCategory() {
     var cat = document.getElementById('mCategory').value;
     if (cat === 'Daily Coordination') {
@@ -401,7 +494,7 @@
         .withSuccessHandler(function (res) {
           showToast(res.message);
           if (res.status === 'success') {
-            document.getElementById('formManual').reset();
+            resetFormWithStatus('formManual');
             document.getElementById('mDate').value = entry.date;
             loadDashboard();
             switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
@@ -504,16 +597,16 @@
   }
 
   function openModalDayoff() {
-    document.getElementById('modalDayoffTitle').innerText = "Tambah Aktivitas Hari Kosong";
+    document.getElementById('modalDayoffTitle').innerText = "Tambah Aktivitas Khusus";
     document.getElementById('doId').value = "";
-    document.getElementById('formDayoffModal').reset();
+    resetFormWithStatus('formDayoffModal');
     document.getElementById('modalDayoff').style.display = 'flex';
   }
 
   function editDayoff(idx) {
     var item = listDayoffData[idx];
     document.getElementById('modalDayoffTitle').innerText = "Edit Aktivitas Hari Kosong";
-    document.getElementById('formDayoffModal').reset();
+    resetFormWithStatus('formDayoffModal');
     document.getElementById('doId').value = item.id;
     document.getElementById('doJudul').value = item.judul;
     document.getElementById('doStartTime').value = item.startTime;
@@ -698,14 +791,14 @@
   function openModalRutin() {
     document.getElementById('modalRutinTitle').innerText = "Tambah Template Jadwal";
     document.getElementById('rId').value = "";
-    document.getElementById('formRutinModal').reset();
+    resetFormWithStatus('formRutinModal');
     document.getElementById('modalRutin').style.display = 'flex';
   }
 
   function editRutin(idx) {
     var item = listRutinData[idx];
     document.getElementById('modalRutinTitle').innerText = "Edit Template Jadwal";
-    document.getElementById('formRutinModal').reset();
+    resetFormWithStatus('formRutinModal');
     document.getElementById('rId').value = item.id;
 
     if (item.dayIndices) {
@@ -862,7 +955,7 @@
   function openModalKelas() {
     document.getElementById('modalKelasTitle').innerText = "Tambah Kelas / Task Desc";
     document.getElementById('kId').value = "";
-    document.getElementById('formKelasModal').reset();
+    resetFormWithStatus('formKelasModal');
     document.getElementById('modalKelas').style.display = 'flex';
   }
 
@@ -1139,6 +1232,7 @@
     document.getElementById('mLevel').value = item.level || '';
     document.getElementById('mTaskType').value = item.taskType || '';
     document.getElementById('mDesc').value = item.taskDesc || '';
+    document.getElementById('mStatus').value = item.status || 'Done';
 
     var btn = document.getElementById('btnSubmitManual');
     btn.innerText = "Simpan Perubahan";
@@ -1168,14 +1262,14 @@
     btn.disabled = true;
 
     google.script.run
-      .withSuccessHandler(function(config) {
+      .withSuccessHandler(function (config) {
         document.getElementById('configUrlInput').value = config.url;
         document.getElementById('configPinInput').value = '';
         document.getElementById('configDbUrl').value = config.personalDbUrl;
         btn.innerText = "Simpan Perubahan";
         btn.disabled = false;
       })
-      .withFailureHandler(function(err) {
+      .withFailureHandler(function (err) {
         showToast("Gagal memuat konfigurasi: " + err.message);
         btn.innerText = "Simpan Perubahan";
         btn.disabled = false;
@@ -1212,7 +1306,7 @@
     msgEl.style.display = "none";
 
     google.script.run
-      .withSuccessHandler(function(res) {
+      .withSuccessHandler(function (res) {
         if (res.status === 'success') {
           currentPin = finalPin;
           document.getElementById('configPinInput').value = '';
@@ -1228,7 +1322,7 @@
         btn.innerText = "Simpan Perubahan";
         btn.disabled = false;
       })
-      .withFailureHandler(function(err) {
+      .withFailureHandler(function (err) {
         msgEl.innerText = "Terjadi kesalahan: " + err.message;
         msgEl.style.color = "red";
         msgEl.style.display = "block";

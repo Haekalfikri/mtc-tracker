@@ -33,6 +33,67 @@ function getFullAppConfig(clientPin) {
     };
 }
 
+function getDropdownOptions(clientPin) {
+    if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
+    var url = _getUrl();
+    if (!url) throw new Error("Spreadsheet URL belum diatur");
+    
+    var ss = SpreadsheetApp.openByUrl(url);
+    var sheet = ss.getSheetByName("Tracker");
+    if (!sheet) throw new Error("Sheet 'Tracker' tidak ditemukan");
+    
+    // Find header row and column indexes
+    var data = sheet.getDataRange().getValues();
+    var headerRowIndex = -1;
+    var colMap = {};
+    
+    // Search for header row in first 5 rows
+    for (var i = 0; i < Math.min(5, data.length); i++) {
+        var row = data[i];
+        // Identify header row if it contains Product and Category
+        if (row.indexOf("Product") !== -1 && row.indexOf("Category") !== -1) {
+            headerRowIndex = i;
+            for (var c = 0; c < row.length; c++) {
+                if (row[c]) colMap[row[c].toString().trim()] = c + 1; // 1-based index
+            }
+            break;
+        }
+    }
+    
+    if (headerRowIndex === -1) throw new Error("Header tidak ditemukan di sheet Tracker");
+    
+    var fields = ["Product", "Category", "Level", "Task Type", "Status"];
+    var options = {};
+    
+    for (var f = 0; f < fields.length; f++) {
+        var field = fields[f];
+        options[field] = [];
+        var colIdx = colMap[field];
+        if (colIdx) {
+            // Get data validation of the cell right below the header
+            var rule = sheet.getRange(headerRowIndex + 2, colIdx).getDataValidation();
+            if (rule) {
+                var criteriaType = rule.getCriteriaType();
+                var args = rule.getCriteriaValues();
+                if (criteriaType === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) {
+                    options[field] = args[0];
+                } else if (criteriaType === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) {
+                    var rangeValues = args[0].getValues();
+                    var list = [];
+                    for (var r = 0; r < rangeValues.length; r++) {
+                        if (rangeValues[r][0] !== "" && rangeValues[r][0] !== null) {
+                            list.push(rangeValues[r][0]);
+                        }
+                    }
+                    options[field] = list;
+                }
+            }
+        }
+    }
+    
+    return options;
+}
+
 function doGet() {
     return HtmlService.createTemplateFromFile('Index')
         .evaluate()
