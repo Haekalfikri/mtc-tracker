@@ -25,12 +25,10 @@ Aplikasi ini bersifat *serverless* dan sepenuhnya menggunakan ekosistem Google s
    - `CSS.html` (Pilih tipe HTML)
    - `JS.html` (Pilih tipe HTML)
    - `Sidebar.html` (Pilih tipe HTML)
-4. Buka file `Code.gs` dan ubah konfigurasi wajib di baris paling atas:
-   - `SECURITY_PIN`: Ganti dengan PIN 4 digit rahasia Anda.
-   - `SPREADSHEET_URL`: Masukkan link URL lengkap Spreadsheet Anda.
-5. Klik tombol biru **Terapkan (Deploy)** > **Deployment Baru**. 
-6. Pilih ikon roda gigi ⚙️ > **Aplikasi Web**. Atur opsi "Siapa yang memiliki akses" menjadi **Siapa saja (Anyone)**.
-7. Otorisasi skrip (hanya untuk pertama kali), dan salin URL Web App yang dihasilkan.
+4. Klik tombol biru **Terapkan (Deploy)** > **Deployment Baru**. 
+5. Pilih ikon roda gigi ⚙️ > **Aplikasi Web**. Atur opsi "Siapa yang memiliki akses" menjadi **Siapa saja (Anyone)**.
+6. Otorisasi skrip (hanya untuk pertama kali), dan salin URL Web App yang dihasilkan.
+7. Setelah berhasil deploy maka halaman utama akan meminta Anda menginput link spreadsheet MTC Productivity Tracker yang dibagikan oleh Acops (Pastikan akses editnya untuk semua orang) dan masukkan pin (4 digit) untuk keamanan.
 
 *(Catatan: Anda dapat menggunakan layanan pemendek URL seperti Bit.ly agar tautan web mudah dihafal).*
 
