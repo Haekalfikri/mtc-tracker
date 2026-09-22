@@ -20,7 +20,7 @@ Aplikasi ini bersifat *serverless* dan sepenuhnya menggunakan ekosistem Google s
 1. Buka file Google Spreadsheet Tracker Anda. Pastikan akses *Share* di pojok kanan atas diubah menjadi **"Siapa saja yang memiliki link"** dengan peran **"Editor"**.
 2. Klik menu **Ekstensi > Apps Script**.
 3. Buat 5 file berikut di dalam editor, lalu salin (*copy-paste*) kode dari masing-masing file yang ada di repositori ini:
-   - `Code.gs` (Pilih tipe Skrip)
+   - `Kode.gs/Code.gs` (File ini sudah ada di appscript tinggal ganti semua isinya)
    - `Index.html` (Pilih tipe HTML)
    - `CSS.html` (Pilih tipe HTML)
    - `JS.html` (Pilih tipe HTML)
