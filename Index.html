@@ -40,7 +40,7 @@
         <input type="password" id="setupPinInput" class="pin-input" maxlength="4" placeholder="••••" inputmode="numeric"
           style="width: 100%; font-size: 1.5rem; letter-spacing: 4px;">
         <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">PIN ini akan digunakan setiap kali
-          Anda membuka aplikasi.</p>
+          Anda membuka website.</p>
       </div>
 
       <button class="btn btn-gold" id="btnSubmitSetup" onclick="submitSetup()" style="width: 100%;">Simpan
@@ -51,16 +51,44 @@
   </div>
 
   <!-- Screen PIN (Wajib Diisi Setiap Buka) -->
-  <div id="pinOverlay" class="modal-overlay" style="display:none;">
-    <div class="modal-box" style="max-width:320px; text-align:center;">
-      <div style="font-size:28px; margin-bottom:4px;">🔒</div>
-      <h3 style="margin:0; color:var(--ea-navy);">MTC Security</h3>
-      <p style="font-size:0.8rem; color:var(--text-muted); margin:6px 0 14px 0;">Masukkan PIN keamanan</p>
-      <input type="password" id="pinInput" class="pin-input" maxlength="4" placeholder="••••••••" inputmode="numeric">
-      <button class="btn btn-gold" onclick="submitPin()">Masuk</button>
-      <div id="pinError" style="color:var(--danger); font-size:0.8rem; margin-top:10px; display:none;">PIN salah!</div>
+  <div id="pinOverlay" class="modal-overlay"
+    style="display:none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+    <div class="modal-box"
+      style="max-width:320px; text-align:center; padding: 40px 24px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+      <div style="font-size:48px; margin-bottom:12px; animation: float 3s ease-in-out infinite;">🔒</div>
+      <h3 style="margin:0; color:var(--ea-navy); font-size: 1.5rem; font-weight: 700;">MTC Security</h3>
+      <p style="font-size:0.9rem; color:var(--text-muted); margin:8px 0 24px 0;">Masukkan PIN keamanan Anda</p>
+      <input type="password" id="pinInput" class="pin-input" maxlength="4" placeholder="••••" inputmode="numeric"
+        style="width:100%; max-width:200px; font-size:2rem; letter-spacing:8px; text-align:center; padding:12px; border-radius:12px; border:2px solid var(--border); transition:all 0.3s ease;">
+      <button class="btn btn-gold" onclick="submitPin()"
+        style="width:100%; max-width:200px; padding:12px; font-size:1rem; border-radius:12px; font-weight:600; margin-top:16px; transition:transform 0.2s ease, box-shadow 0.2s ease;">Login</button>
+      <div id="pinError"
+        style="color:var(--danger); font-size:0.85rem; font-weight: 600; margin-top:16px; display:none;">PIN salah,
+        silakan coba lagi!</div>
     </div>
   </div>
+
+  <style>
+    @keyframes float {
+      0% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+
+      100% {
+        transform: translateY(0px);
+      }
+    }
+
+    #pinInput:focus {
+      border-color: var(--ea-gold) !important;
+      box-shadow: 0 0 0 3px rgba(238, 179, 21, 0.2) !important;
+      outline: none !important;
+    }
+  </style>
 
   <div class="layout-wrapper" id="appContent" style="display:none;">
 
@@ -115,7 +143,7 @@
               <!-- Working Hours Goal -->
               <div class="goal-item">
                 <div class="goal-top">
-                  <span class="goal-label">Weekly Working Hours</span>
+                  <span class="goal-label">Working Hours</span>
                   <div class="goal-stats">
                     <span id="txtWorkingHours" class="goal-value">0 / 30 jam</span>
                   </div>
@@ -148,7 +176,7 @@
           <div class="premium-panel">
             <div class="panel-header">
               <div>
-                <h2>Sesi Tersimpan</h2>
+                <h2>My Schedule</h2>
                 <p id="lblLogDate">Memuat tanggal...</p>
               </div>
             </div>
@@ -168,7 +196,7 @@
           <!-- Mode 1: Manual Input -->
           <div id="modeManual" class="card view-panel active">
             <div class="card-header-clean">
-              <h2>Input Sesi Manual</h2>
+              <h2>Input Jadwal</h2>
             </div>
             <form id="formManual" onsubmit="handleManualSubmit(event)">
               <div class="form-grid two-col">

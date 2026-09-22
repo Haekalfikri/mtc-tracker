@@ -37,16 +37,16 @@ function getDropdownOptions(clientPin) {
     if (clientPin !== _getPin()) throw new Error("Akses ditolak: PIN salah.");
     var url = _getUrl();
     if (!url) throw new Error("Spreadsheet URL belum diatur");
-    
+
     var ss = SpreadsheetApp.openByUrl(url);
     var sheet = ss.getSheetByName("Tracker");
     if (!sheet) throw new Error("Sheet 'Tracker' tidak ditemukan");
-    
+
     // Find header row and column indexes
     var data = sheet.getDataRange().getValues();
     var headerRowIndex = -1;
     var colMap = {};
-    
+
     // Search for header row in first 5 rows
     for (var i = 0; i < Math.min(5, data.length); i++) {
         var row = data[i];
@@ -59,12 +59,12 @@ function getDropdownOptions(clientPin) {
             break;
         }
     }
-    
+
     if (headerRowIndex === -1) throw new Error("Header tidak ditemukan di sheet Tracker");
-    
+
     var fields = ["Product", "Category", "Level", "Task Type", "Status"];
     var options = {};
-    
+
     for (var f = 0; f < fields.length; f++) {
         var field = fields[f];
         options[field] = [];
@@ -90,7 +90,7 @@ function getDropdownOptions(clientPin) {
             }
         }
     }
-    
+
     return options;
 }
 
@@ -128,7 +128,7 @@ function getISOWeekNumber(d) {
     var date = new Date(d.getTime());
     // Use GMT+8 for consistency
     var witaStr = Utilities.formatDate(date, TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss");
-    var witaDate = new Date(witaStr.substring(0,4), parseInt(witaStr.substring(5,7))-1, witaStr.substring(8,10));
+    var witaDate = new Date(witaStr.substring(0, 4), parseInt(witaStr.substring(5, 7)) - 1, witaStr.substring(8, 10));
     witaDate.setHours(0, 0, 0, 0);
     witaDate.setDate(witaDate.getDate() + 3 - (witaDate.getDay() + 6) % 7);
     var week1 = new Date(witaDate.getFullYear(), 0, 4);
@@ -155,7 +155,7 @@ function formatTanggalIndo(dateObj) {
     var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     var dStr = Utilities.formatDate(dateObj, TIMEZONE, "d M yyyy");
     var parts = dStr.split(" ");
-    return parts[0] + " " + months[parseInt(parts[1])-1] + " " + parts[2];
+    return parts[0] + " " + months[parseInt(parts[1]) - 1] + " " + parts[2];
 }
 
 function parseTanggalToDateObj(rawDate) {
@@ -192,11 +192,11 @@ function getDashboardStats(selectedDateStr, clientPin) {
     var targetDateObj;
     if (selectedDateStr) {
         var parts = selectedDateStr.split('-');
-        targetDateObj = new Date(parts[0], parts[1]-1, parts[2]);
+        targetDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
     } else {
         var nowWita = Utilities.formatDate(new Date(), TIMEZONE, "yyyy-MM-dd");
         var p = nowWita.split('-');
-        targetDateObj = new Date(p[0], p[1]-1, p[2]);
+        targetDateObj = new Date(p[0], p[1] - 1, p[2]);
     }
 
     var targetWeek = "Week " + getISOWeekNumber(targetDateObj);
@@ -277,7 +277,7 @@ function simpanDataTracker(entries, clientPin) {
         var lastRowForOverlap = sheet.getLastRow();
         if (lastRowForOverlap >= 3) {
             // Ambil dari D3 sampai M (kolom 4 sampai 13)
-            existingData = sheet.getRange(3, 4, lastRowForOverlap - 2, 10).getValues(); 
+            existingData = sheet.getRange(3, 4, lastRowForOverlap - 2, 10).getValues();
         }
 
         function timeToMins(tStr) {
@@ -295,7 +295,7 @@ function simpanDataTracker(entries, clientPin) {
             var dateParts = d.date.split('-');
             var dObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
             var tglIndo = formatTanggalIndo(dObj);
-            
+
             var newStartMins = timeToMins(d.startTime);
             var newEndMins = timeToMins(d.endTime);
 
@@ -388,13 +388,13 @@ function simpanDataTracker(entries, clientPin) {
             var lastCol = sheet.getLastColumn();
             sheet.insertColumnAfter(lastCol);
             var tempCol = lastCol + 1;
-            
+
             // Tulis timestamp ke tempCol
             sheet.getRange(3, tempCol, timestamps.length, 1).setValues(timestamps);
 
             // 4. Sortir seluruh range (A3 sampai kolom temporer) secara ascending
             var fullRange = sheet.getRange(3, 1, newLastDataRow - 2, tempCol);
-            fullRange.sort({column: tempCol, ascending: true});
+            fullRange.sort({ column: tempCol, ascending: true });
 
             // 5. Hapus kolom temporer
             sheet.deleteColumn(tempCol);
@@ -423,7 +423,7 @@ function editBarisTracker(rowIndex, d, clientPin) {
     try {
         var ss = SpreadsheetApp.openByUrl(_getUrl());
         var sheet = ss.getSheetByName('Tracker');
-        
+
         var dateParts = d.date.split('-');
         var dObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
         var tglIndo = formatTanggalIndo(dObj);
@@ -434,7 +434,7 @@ function editBarisTracker(rowIndex, d, clientPin) {
 
         // Replace range in row D to P
         sheet.getRange(rowIndex, 4, 1, 13).setValues(newRowData);
-        
+
         return { status: 'success', message: 'Aktivitas berhasil diperbarui!' };
     } catch (err) {
         return { status: 'error', message: err.toString() };
@@ -725,15 +725,15 @@ function getAllTrackerData(clientPin) {
 
     // Ambil Kolom D sampai P (Kolom 4 sampai 16 = 13 kolom) mulai dari baris 3
     var data = sheet.getRange(3, 4, lastRow - 2, 13).getDisplayValues();
-    
+
     var result = [];
     for (var i = 0; i < data.length; i++) {
         var row = data[i];
         if (!row[0]) continue; // Skip jika tanggal kosong
-        
+
         var dStr = row[0]; // e.g. "9 September 2026"
         var tStr = row[2]; // startTime
-        
+
         var dObjItem = parseTanggalToDateObj(dStr);
         if (tStr) {
             var tStrMatch = formatJamTeks(tStr).match(/(\d{1,2}):(\d{2})/);
@@ -741,15 +741,15 @@ function getAllTrackerData(clientPin) {
                 dObjItem.setHours(parseInt(tStrMatch[1]), parseInt(tStrMatch[2]), 0, 0);
             }
         }
-        
+
         // Kalkulasi durasi (desimal) untuk frontend progress bar
         var duration = 0;
         if (row[2] && row[3]) {
             var stMatch = formatJamTeks(row[2]).match(/(\d{1,2}):(\d{2})/);
             var etMatch = formatJamTeks(row[3]).match(/(\d{1,2}):(\d{2})/);
             if (stMatch && etMatch) {
-                var sHour = parseInt(stMatch[1]) + parseInt(stMatch[2])/60;
-                var eHour = parseInt(etMatch[1]) + parseInt(etMatch[2])/60;
+                var sHour = parseInt(stMatch[1]) + parseInt(stMatch[2]) / 60;
+                var eHour = parseInt(etMatch[1]) + parseInt(etMatch[2]) / 60;
                 duration = eHour - sHour;
                 if (duration < 0) duration += 24;
             }
@@ -778,7 +778,7 @@ function getAllTrackerData(clientPin) {
     }
 
     // Urutkan dari yang terbaru di atas (descending)
-    result.sort(function(a, b) {
+    result.sort(function (a, b) {
         return b.unixTime - a.unixTime;
     });
 

@@ -7,7 +7,7 @@
     var d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
   }
-  
+
   var todayLogsData = [];
   var editingRowIndex = null;
 
@@ -18,6 +18,14 @@
     document.getElementById('bDate').value = today;
 
     document.getElementById('pinInput').value = '';
+    // Event listener untuk Enter key pada form PIN
+    document.getElementById('pinInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        submitPin();
+      }
+    });
+
+
     document.getElementById('appContent').style.display = 'none';
 
     // Cek apakah aplikasi sudah disetup pertama kali
@@ -235,7 +243,7 @@
 
   function resetFormWithStatus(formId) {
     var frm = document.getElementById(formId);
-    if(frm) {
+    if (frm) {
       frm.reset();
       frm.querySelectorAll('.dyn-status').forEach(function (sel) {
         if (sel.id.toLowerCase().indexOf('filter') === -1) {
@@ -389,6 +397,29 @@
     document.getElementById('btnCancelEdit').style.display = 'block';
 
     switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+
+    // Enter key for setup
+    var setupInputs = ['setupUrlInput', 'setupPinInput'];
+    setupInputs.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitSetup();
+        });
+      }
+    });
+
+    // Enter key for config
+    var configInputs = ['configUrlInput', 'configPinInput', 'configDbUrl'];
+    configInputs.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitConfig();
+        });
+      }
+    });
+
   }
 
   function cancelEdit() {
@@ -402,6 +433,29 @@
     if (cancelBtn) cancelBtn.style.display = 'none';
 
     switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+
+    // Enter key for setup
+    var setupInputs = ['setupUrlInput', 'setupPinInput'];
+    setupInputs.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitSetup();
+        });
+      }
+    });
+
+    // Enter key for config
+    var configInputs = ['configUrlInput', 'configPinInput', 'configDbUrl'];
+    configInputs.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitConfig();
+        });
+      }
+    });
+
   }
 
   function deleteSession(rowIndex) {
@@ -498,6 +552,29 @@
             document.getElementById('mDate').value = entry.date;
             loadDashboard();
             switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+
+            // Enter key for setup
+            var setupInputs = ['setupUrlInput', 'setupPinInput'];
+            setupInputs.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) {
+                el.addEventListener('keydown', function (e) {
+                  if (e.key === 'Enter') submitSetup();
+                });
+              }
+            });
+
+            // Enter key for config
+            var configInputs = ['configUrlInput', 'configPinInput', 'configDbUrl'];
+            configInputs.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) {
+                el.addEventListener('keydown', function (e) {
+                  if (e.key === 'Enter') submitConfig();
+                });
+              }
+            });
+
           }
           btn.disabled = false;
           btn.innerText = "Submit Tracker";
@@ -1109,8 +1186,10 @@
     });
 
     var numWeeks = uniqueWeeks.size || 1;
-    var targetW = numWeeks * 30;
-    var targetT = numWeeks * 18;
+    var monthSelected = document.getElementById('dbMonthFilter').value;
+    
+    var targetW = monthSelected ? 120 : (numWeeks * 30);
+    var targetT = monthSelected ? 72 : (numWeeks * 18);
 
     // Insight Dinamis (Berdasarkan Target Kumulatif)
     var insightW = document.getElementById('dbInsightWorking');
@@ -1250,6 +1329,29 @@
     document.getElementById('btnCancelEdit').style.display = 'block';
 
     switchView('modeManual', document.querySelector('.sidebar-menu a[onclick*="modeManual"]'));
+
+    // Enter key for setup
+    var setupInputs = ['setupUrlInput', 'setupPinInput'];
+    setupInputs.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitSetup();
+        });
+      }
+    });
+
+    // Enter key for config
+    var configInputs = ['configUrlInput', 'configPinInput', 'configDbUrl'];
+    configInputs.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submitConfig();
+        });
+      }
+    });
+
   }
 
 

@@ -109,6 +109,7 @@
   .sidebar-scrollable::-webkit-scrollbar {
     width: 6px;
   }
+
   .sidebar-scrollable::-webkit-scrollbar-thumb {
     background: #334155;
     border-radius: 4px;
@@ -171,7 +172,7 @@
     font-weight: 700;
     position: relative;
   }
-  
+
   .sidebar-menu a.active::before {
     content: "";
     position: absolute;
@@ -323,6 +324,7 @@
     .mobile-only-btn {
       display: inline-block;
     }
+
     .close-sidebar-btn {
       display: flex;
     }
@@ -421,6 +423,7 @@
   .goal-item {
     margin-bottom: 24px;
   }
+
   .goal-item:last-child {
     margin-bottom: 0;
   }
@@ -480,12 +483,22 @@
     font-weight: 500;
     color: #64748b;
   }
+
   .goal-insight span {
     font-weight: 700;
   }
-  .insight-success { color: #10b981; }
-  .insight-warning { color: #f59e0b; }
-  .insight-danger { color: #ef4444; }
+
+  .insight-success {
+    color: #10b981;
+  }
+
+  .insight-warning {
+    color: #f59e0b;
+  }
+
+  .insight-danger {
+    color: #ef4444;
+  }
 
   .goal-divider {
     height: 1px;
@@ -505,7 +518,7 @@
     padding-bottom: 24px;
     border-left: 2px solid #e2e8f0;
   }
-  
+
   .timeline-item:last-child {
     border-left-color: transparent;
     padding-bottom: 0;
@@ -534,10 +547,10 @@
     align-items: flex-start;
     transition: all 0.2s;
   }
-  
+
   .timeline-content:hover {
     background: #ffffff;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     border-color: #e2e8f0;
   }
 
@@ -553,7 +566,7 @@
     color: #64748b;
     font-weight: 500;
   }
-  
+
   .timeline-action button {
     background: transparent;
     color: #ef4444;
@@ -565,7 +578,7 @@
     cursor: pointer;
     transition: all 0.2s;
   }
-  
+
   .timeline-action button:hover {
     background: #fee2e2;
   }
@@ -1006,6 +1019,7 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(4px);
   }
+
   /* Day Checkbox Pills */
   .day-checkbox-group {
     display: flex;
@@ -1013,14 +1027,17 @@
     flex-wrap: wrap;
     margin-bottom: 12px;
   }
+
   .day-checkbox {
     display: inline-block;
     cursor: pointer;
     margin: 0;
   }
+
   .day-checkbox input {
     display: none;
   }
+
   .day-label {
     display: inline-flex;
     align-items: center;
@@ -1035,12 +1052,14 @@
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
   }
-  .day-checkbox input:checked + .day-label {
+
+  .day-checkbox input:checked+.day-label {
     background-color: var(--ea-gold);
     border-color: var(--ea-gold);
     color: var(--ea-navy);
     box-shadow: 0 2px 8px rgba(255, 184, 0, 0.3);
   }
+
   .day-checkbox:hover .day-label {
     border-color: var(--ea-gold);
   }
