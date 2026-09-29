@@ -142,7 +142,7 @@ function formatJamTeks(val) {
         return str;
     }
     var str = val.toString().trim();
-    var match = str.match(/(\d{1,2}):(\d{2})/);
+    var match = str.match(/(\d{1,2})[:\.](\d{2})/);
     if (match) {
         var hh = ("0" + match[1]).slice(-2);
         var mm = match[2];
@@ -280,7 +280,7 @@ function simpanDataTracker(entries, clientPin) {
         var lastRowForOverlap = sheet.getLastRow();
         if (lastRowForOverlap >= 3) {
             // Ambil dari D3 sampai M (kolom 4 sampai 13)
-            existingData = sheet.getRange(3, 4, lastRowForOverlap - 2, 10).getValues();
+            existingData = sheet.getRange(3, 4, lastRowForOverlap - 2, 10).getDisplayValues();
         }
 
         function timeToMins(tStr) {
