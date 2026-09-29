@@ -151,8 +151,8 @@ function formatJamTeks(val) {
     return str;
 }
 
-function formatTanggalIndo(dateObj) {
-    var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+function formatTanggalSheet(dateObj) {
+    var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     var dStr = Utilities.formatDate(dateObj, TIMEZONE, "d M yyyy");
     var parts = dStr.split(" ");
     return parts[0] + " " + months[parseInt(parts[1]) - 1] + " " + parts[2];
@@ -164,6 +164,9 @@ function parseTanggalToDateObj(rawDate) {
         var indoMatch = rawDate.match(/(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
         if (indoMatch) {
             var mIndex = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].indexOf(indoMatch[2]);
+            if (mIndex === -1) {
+                mIndex = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].indexOf(indoMatch[2]);
+            }
             if (mIndex !== -1) {
                 return new Date(parseInt(indoMatch[3]), mIndex, parseInt(indoMatch[1]));
             }
@@ -294,7 +297,7 @@ function simpanDataTracker(entries, clientPin) {
             var d = entries[j];
             var dateParts = d.date.split('-');
             var dObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-            var tglIndo = formatTanggalIndo(dObj);
+            var tglSheet = formatTanggalSheet(dObj);
 
             var newStartMins = timeToMins(d.startTime);
             var newEndMins = timeToMins(d.endTime);
@@ -302,13 +305,17 @@ function simpanDataTracker(entries, clientPin) {
             // 1. Cek bentrok dengan data lama di sheet
             for (var k = 0; k < existingData.length; k++) {
                 var extRow = existingData[k];
-                var extTglIndo = extRow[0]; // Kolom D
-                if (extTglIndo === tglIndo) {
+                var extTglVal = extRow[0]; // Kolom D
+                
+                var extDateObj = parseTanggalToDateObj(extTglVal);
+                var extDateStr = Utilities.formatDate(extDateObj, TIMEZONE, "yyyy-MM-dd");
+                
+                if (extDateStr === d.date) {
                     var extStartMins = timeToMins(extRow[2]); // Kolom F
                     var extEndMins = timeToMins(extRow[3]);   // Kolom G
                     if (extStartMins > 0 && extEndMins > 0 && newStartMins > 0 && newEndMins > 0) {
                         if (Math.max(extStartMins, newStartMins) < Math.min(extEndMins, newEndMins)) {
-                            conflictErrors.push("Bentrok tgl " + tglIndo + " (" + d.startTime + "-" + d.endTime + ") dengan: " + extRow[9]);
+                            conflictErrors.push("Bentrok tgl " + tglSheet + " (" + d.startTime + "-" + d.endTime + ") dengan: " + extRow[9]);
                         }
                     }
                 }
@@ -321,13 +328,13 @@ function simpanDataTracker(entries, clientPin) {
                     var prevStartMins = timeToMins(prevE.startTime);
                     var prevEndMins = timeToMins(prevE.endTime);
                     if (Math.max(prevStartMins, newStartMins) < Math.min(prevEndMins, newEndMins)) {
-                        conflictErrors.push("Bentrok antar-jadwal baru tgl " + tglIndo + " (" + d.startTime + "-" + d.endTime + ") dengan: " + prevE.taskDesc);
+                        conflictErrors.push("Bentrok antar-jadwal baru tgl " + tglSheet + " (" + d.startTime + "-" + d.endTime + ") dengan: " + prevE.taskDesc);
                     }
                 }
             }
 
             rowsToAdd.push([
-                tglIndo, // Col D (4)
+                tglSheet, // Col D (4)
                 "", // Col E (5)
                 d.startTime, // Col F (6)
                 d.endTime, // Col G (7)
@@ -426,10 +433,10 @@ function editBarisTracker(rowIndex, d, clientPin) {
 
         var dateParts = d.date.split('-');
         var dObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-        var tglIndo = formatTanggalIndo(dObj);
+        var tglSheet = formatTanggalSheet(dObj);
 
         var newRowData = [
-            [tglIndo, "", d.startTime, d.endTime, "", d.product, d.category, d.level || "", d.taskType, d.taskDesc, d.evidence || "", d.status || "Done", d.notes || ""]
+            [tglSheet, "", d.startTime, d.endTime, "", d.product, d.category, d.level || "", d.taskType, d.taskDesc, d.evidence || "", d.status || "Done", d.notes || ""]
         ];
 
         // Replace range in row D to P
