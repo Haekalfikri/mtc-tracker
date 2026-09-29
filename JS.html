@@ -428,7 +428,12 @@
     var today = getLocalDateString();
     document.getElementById('mDate').value = today;
 
-    document.getElementById('btnSubmitManual').innerText = "Submit Tracker";
+    var btn = document.getElementById('btnSubmitManual');
+    if (btn) {
+      btn.innerText = "Submit Tracker";
+      btn.disabled = false;
+    }
+    
     var cancelBtn = document.getElementById('btnCancelEdit');
     if (cancelBtn) cancelBtn.style.display = 'none';
 
@@ -1187,7 +1192,7 @@
 
     var numWeeks = uniqueWeeks.size || 1;
     var monthSelected = document.getElementById('dbMonthFilter').value;
-    
+
     var targetW = monthSelected ? 120 : (numWeeks * 30);
     var targetT = monthSelected ? 72 : (numWeeks * 18);
 
